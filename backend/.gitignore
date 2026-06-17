@@ -4,3 +4,4 @@ __pycache__/
 venv/
 *.csv
 dump.sql
+google_credentials.json
