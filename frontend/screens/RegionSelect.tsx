@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useState } from 'react';
 
 // left, top = 365x434 기준 배지 좌측 상단 위치
@@ -22,6 +22,8 @@ const REGIONS = [
 
 export default function RegionSelect() {
   const navigation = useNavigation() as any;
+  const route = useRoute() as any;           
+  const transcript = route.params?.transcript; 
   const [selected, setSelected] = useState<string | null>(null);
 
   return (
@@ -67,7 +69,13 @@ export default function RegionSelect() {
 
       {/* 하단 버튼 */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.confirmBtn} onPress={() => navigation.navigate('RecipeProcessing')}>
+        <TouchableOpacity
+          style={styles.confirmBtn}
+          onPress={() => navigation.navigate('RecipeProcessing', {
+            transcript,
+            region: selected,
+          })}
+        >
           <Text style={styles.confirmBtnText}>레시피 완성하기</Text>
         </TouchableOpacity>
       </View>

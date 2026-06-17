@@ -1,9 +1,50 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync } from 'expo-audio';
+import { useState } from 'react';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function RecipeRecording() {
   const navigation = useNavigation() as any;
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [isRecording, setIsRecording] = useState(false);
+
+const startRecording = async () => {
+    const permission = await AudioModule.requestRecordingPermissionsAsync();
+    if (!permission.granted) return;
+    try {
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+      setIsRecording(true);
+    } catch (e) {
+      console.log('녹음 에러:', e);
+    }
+  };
+
+const stopAndSend = async () => {
+    if (!isRecording) {
+      return;
+    }
+    await audioRecorder.stop();
+    const uri = audioRecorder.uri;
+
+    const formData = new FormData();
+    formData.append('file', { uri, name: 'recording.m4a', type: 'audio/m4a' } as any);
+
+    try {
+      const res = await fetch(`${API_URL}/speech-to-text`, { method: 'POST', body: formData });
+      const data = await res.json();
+      navigation.navigate('RegionSelect', { transcript: data.text });
+    } catch (e) {
+      console.log('fetch 에러:', e);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -21,18 +62,20 @@ export default function RecipeRecording() {
 
       {/* 마이크 버튼 (녹음 중 상태) */}
       <View style={styles.micWrapper}>
-        <View style={styles.micOuter}>
-          <View style={styles.glowOuter} />
-          <View style={styles.glowMiddle} />
-          <View style={styles.micCircle}>
-            <Image source={require('../assets/images/record_ing.png')} style={styles.micIcon} />
+        <TouchableOpacity onPress={startRecording}>
+          <View style={styles.micOuter}>
+            <View style={styles.glowOuter} />
+            <View style={styles.glowMiddle} />
+            <View style={styles.micCircle}>
+              <Image source={require('../assets/images/record_ing.png')} style={styles.micIcon} />
+            </View>
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* 하단 버튼 */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.endBtn} onPress={() => navigation.navigate('RegionSelect')}>
+        <TouchableOpacity style={styles.endBtn} onPress={stopAndSend}>
           <Text style={styles.endBtnText}>레시피 말하기 끝내기</Text>
         </TouchableOpacity>
       </View>
