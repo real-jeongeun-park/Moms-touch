@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { Image, ImageSourcePropType, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { Dimensions } from 'react-native';
 
 type Step = 'region' | 'food' | 'level';
 
+const screenWidth = Dimensions.get('window').width;
 const REGION_STEP = 0;
 const FOOD_STEP = 1;
 const LEVEL_STEP = 2;
 const MAP_BASE_WIDTH = 365;
 const MAP_BASE_HEIGHT = 434;
-const MAP_WIDTH = 300;
+const MAP_WIDTH = screenWidth - 40;
 const MAP_HEIGHT = (MAP_WIDTH * MAP_BASE_HEIGHT) / MAP_BASE_WIDTH;
 const MAP_SCALE = MAP_WIDTH / MAP_BASE_WIDTH;
 
