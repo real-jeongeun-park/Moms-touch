@@ -1,8 +1,11 @@
-import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState, useCallback } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+const ngrokHeader = { 'ngrok-skip-browser-warning': '1' };
 
 type TabType = 'made' | 'liked';
 
@@ -13,18 +16,35 @@ export default function UserProfile() {
   const region = route.params?.region ?? '전라도';
 
   const [activeTab, setActiveTab] = useState<TabType>('made');
+  const [madeRecipes, setMadeRecipes] = useState<any[]>([]);
+  const [likedRecipes, setLikedRecipes] = useState<any[]>([]);
+  const [stats, setStats] = useState({ recipe_count: 0, challenger_count: 0, like_received: 0 });
+  const [loading, setLoading] = useState(true);
 
-  // 탭별 레시피 (실데이터 연동 전 임시)
-  const profileAvatar = require('../assets/images/grandma_mypage.png');
-  const madeRecipes = [
-    { id: 1, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name, avatar: profileAvatar },
-    { id: 2, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name, avatar: profileAvatar },
-    { id: 3, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name, avatar: profileAvatar },
-  ];
-  const likedRecipes = [
-    { id: 1, title: '꼬막무침', desc: '삶은 꼬막과 매콤새콤한 양념의 조화꼬막무침꼬막무침꼬막무침꼬막무침', author: '순자 할머니', avatar: require('../assets/images/grandma_cook.png') },
-    { id: 2, title: '동태찌개', desc: '칼칼하고 시원한 동태찌개동태찌개동태찌개동태찌개동태찌개동태찌개', author: '영자 할머니', avatar: require('../assets/images/grandma_talk.png') },
-  ];
+  useFocusEffect(useCallback(() => {
+    const loadProfile = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(
+          `${API_URL}/users/by-nickname/${encodeURIComponent(name)}/profile`,
+          { headers: ngrokHeader }
+        );
+        if (!res.ok) throw new Error('profile fetch 실패');
+        const data = await res.json();
+        setMadeRecipes(data.made ?? []);
+        setLikedRecipes(data.liked ?? []);
+        setStats(data.stats ?? { recipe_count: 0, challenger_count: 0, like_received: 0 });
+      } catch (e) {
+        console.log('유저 프로필 로드 에러:', e);
+        setMadeRecipes([]);
+        setLikedRecipes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProfile();
+  }, [name]));
+
   const recipes = activeTab === 'made' ? madeRecipes : likedRecipes;
 
   return (
@@ -60,11 +80,11 @@ export default function UserProfile() {
           <Text style={styles.name}>{name}</Text>
 
           <View style={styles.statsBox}>
-            <StatItem label="레시피" value="9" />
+            <StatItem label="레시피" value={String(stats.recipe_count)} />
             <View style={styles.statDivider} />
-            <StatItem label="레시피 도전자" value="9" />
+            <StatItem label="레시피 도전자" value={String(stats.challenger_count)} />
             <View style={styles.statDivider} />
-            <StatItem label="좋아요 받은 수" value="9" />
+            <StatItem label="좋아요 받은 수" value={String(stats.like_received)} />
           </View>
         </View>
 
@@ -81,23 +101,31 @@ export default function UserProfile() {
         </View>
 
         {/* 카드 목록 */}
-        <View style={styles.cardList}>
-          {recipes.map(recipe => (
-            <TouchableOpacity
-              key={`${activeTab}-${recipe.id}`}
-              style={styles.recipeCard}
-              activeOpacity={0.9}
-              onPress={() => navigation.navigate('RecipeDetail', { recipe })}
-            >
-              <Text style={styles.recipeTitle}>{recipe.title}</Text>
-              <Text style={styles.recipeDesc} numberOfLines={2}>{recipe.desc}</Text>
-              <View style={styles.authorRow}>
-                <Image source={recipe.avatar} style={styles.authorAvatar} resizeMode="cover" />
-                <Text style={styles.authorText}>{recipe.author}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {loading ? (
+          <ActivityIndicator color="#FFA23E" style={{ marginTop: 32 }} />
+        ) : recipes.length === 0 ? (
+          <Text style={styles.emptyText}>
+            {activeTab === 'made' ? '아직 올린 레시피가 없어요' : '아직 좋아요 누른 레시피가 없어요'}
+          </Text>
+        ) : (
+          <View style={styles.cardList}>
+            {recipes.map(recipe => (
+              <TouchableOpacity
+                key={`${activeTab}-${recipe.id}`}
+                style={styles.recipeCard}
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate('RecipeDetail', { recipe_id: recipe.id })}
+              >
+                <Text style={styles.recipeTitle}>{recipe.title}</Text>
+                <Text style={styles.recipeDesc} numberOfLines={2}>{recipe.description}</Text>
+                <View style={styles.authorRow}>
+                  <Image source={require('../assets/images/profile.png')} style={styles.authorAvatar} resizeMode="cover" />
+                  <Text style={styles.authorText}>{recipe.author ?? name}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -302,5 +330,12 @@ const styles = StyleSheet.create({
     fontFamily: 'NanumHuman-Bold',
     fontSize: 16,
     color: '#181818',
+  },
+  emptyText: {
+    fontFamily: 'NanumHuman-Regular',
+    fontSize: 14,
+    color: '#9B9794',
+    textAlign: 'center',
+    marginTop: 40,
   },
 });

@@ -2,8 +2,11 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, ActivityIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+
+const ngrokHeader = { 'ngrok-skip-browser-warning': '1' };
 
 const starImages: Record<number, any> = {
   1: require('../assets/images/star1.png'),
@@ -20,11 +23,17 @@ export default function RecipeDetail() {
 
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [liked, setLiked] = useState(false);
 
   useEffect(() => {
     const fetchRecipe = async () => {
       try {
-        const res = await fetch(`${API_URL}/recipes/${recipe_id}`, { headers: { 'ngrok-skip-browser-warning': '1' } });
+        const userStr = await AsyncStorage.getItem('user');
+        const u = userStr ? JSON.parse(userStr) : null;
+        setUser(u);
+
+        const res = await fetch(`${API_URL}/recipes/${recipe_id}`, { headers: ngrokHeader });
         if (!res.ok) throw new Error('fetch 실패');
         const data = await res.json();
         // ingredients가 dict이면 배열로 변환 (화면 표시용)
@@ -32,6 +41,13 @@ export default function RecipeDetail() {
           data.ingredients = Object.entries(data.ingredients).map(([name, amount]) => ({ name, amount }));
         }
         setRecipe(data);
+
+        // 현재 유저가 이미 좋아요를 눌렀는지 확인
+        if (u) {
+          const fRes = await fetch(`${API_URL}/users/${u.id}/recipes/followed`, { headers: ngrokHeader });
+          const fData = await fRes.json();
+          setLiked((fData.recipes ?? []).some((r: any) => r.id === recipe_id));
+        }
       } catch (e) {
         console.error('레시피 불러오기 실패:', e);
       } finally {
@@ -40,6 +56,22 @@ export default function RecipeDetail() {
     };
     fetchRecipe();
   }, [recipe_id]);
+
+  const toggleLike = async () => {
+    if (!user) return;
+    const next = !liked;
+    setLiked(next); // 낙관적 업데이트
+    try {
+      await fetch(`${API_URL}/recipe-follows`, {
+        method: next ? 'POST' : 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...ngrokHeader },
+        body: JSON.stringify({ user_id: user.id, recipe_id }),
+      });
+    } catch (e) {
+      setLiked(!next); // 실패 시 롤백
+      console.log('좋아요 토글 에러:', e);
+    }
+  };
 
   if (loading) return (
     <SafeAreaView style={styles.container}>
@@ -81,7 +113,32 @@ export default function RecipeDetail() {
           <Text style={styles.title}>{recipe.title}</Text>
           <Text style={styles.subtitle}>{recipe.description}</Text>
 
-          {/* 정보 */}
+          {/* 작성자 + 좋아요 */}
+          <View style={styles.authorRow}>
+            <TouchableOpacity
+              style={styles.authorLeft}
+              onPress={() => navigation.navigate('UserProfile', { name: recipe.author, region: recipe.region })}
+              activeOpacity={0.7}
+            >
+              <Image source={require('../assets/images/profile.png')} style={styles.authorAvatar} />
+              <Text style={styles.authorName}>{recipe.author ?? '익명'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleLike} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Image
+                source={liked
+                  ? require('../assets/images/full_heart.png')
+                  : require('../assets/images/empty_heart.png')}
+                style={styles.heartIcon}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 작성자-정보 사이 구분선 */}
+        <View style={styles.divider} />
+
+        {/* 정보 */}
+        <View style={styles.infoSection}>
           <View style={styles.infoBox}>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>지역</Text>
@@ -172,7 +229,15 @@ const styles = StyleSheet.create({
   // 제목
   titleSection: { paddingHorizontal: 28, paddingTop: 8, paddingBottom: 24 },
   title: { fontSize: 24, fontWeight: '800', color: '#181818', marginBottom: 6 },
-  subtitle: { fontSize: 15, color: '#8D8986', marginBottom: 20 },
+  subtitle: { fontSize: 15, color: '#8D8986', marginBottom: 14 },
+
+  // 작성자 + 좋아요 (Figma 스펙)
+  authorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  infoSection: { paddingHorizontal: 28, paddingTop: 20 },
+  authorLeft: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  authorAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFEAB4' },
+  authorName: { fontSize: 16, color: '#595653' },
+  heartIcon: { width: 28, height: 28, resizeMode: 'contain' },
 
   // 정보
   infoBox: { gap: 10 },

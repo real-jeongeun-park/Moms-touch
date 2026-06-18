@@ -9,41 +9,61 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 type TabType = 'made' | 'followed';
 
+const ngrokHeader = { 'ngrok-skip-browser-warning': '1' };
+
 export default function MyPage() {
   const navigation = useNavigation() as any;
   const [activeTab, setActiveTab] = useState<TabType>('made');
   const [userName, setUserName] = useState('');
+  const [userId, setUserId] = useState<number | null>(null);
   const [madeRecipes, setMadeRecipes] = useState<any[]>([]);
   const [followedRecipes, setFollowedRecipes] = useState<any[]>([]);
+  const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
+  const [stats, setStats] = useState({ recipe_count: 0, challenger_count: 0, like_received: 0 });
   const [loading, setLoading] = useState(true);
 
-  useFocusEffect(useCallback(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const userStr = await AsyncStorage.getItem('user');
-        const user = userStr ? JSON.parse(userStr) : null;
-        if (!user) return;
-        setUserName(user.user_id);
-        const ngrokHeader = { 'ngrok-skip-browser-warning': '1' };
-        const [madeRes, followedRes] = await Promise.all([
-          fetch(`${API_URL}/users/${user.id}/recipes/made`, { headers: ngrokHeader }),
-          fetch(`${API_URL}/users/${user.id}/recipes/followed`, { headers: ngrokHeader }),
-        ]);
-        const madeData = await madeRes.json();
-        const followedData = await followedRes.json();
-        setMadeRecipes(madeData.recipes ?? []);
-        setFollowedRecipes(followedData.recipes ?? []);
-      } catch (e) {
-        console.log('마이페이지 로드 에러:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []));
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const userStr = await AsyncStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (!user) return;
+      setUserName(user.user_id);
+      setUserId(user.id);
+      const res = await fetch(
+        `${API_URL}/users/by-nickname/${encodeURIComponent(user.user_id)}/profile`,
+        { headers: ngrokHeader }
+      );
+      const data = await res.json();
+      setMadeRecipes(data.made ?? []);
+      setFollowedRecipes(data.liked ?? []);
+      setLikedIds(new Set((data.liked ?? []).map((r: any) => r.id)));
+      setStats(data.stats ?? { recipe_count: 0, challenger_count: 0, like_received: 0 });
+    } catch (e) {
+      console.log('마이페이지 로드 에러:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const displayRecipes = activeTab === 'made' ? madeRecipes : followedRecipes;
+
+  const toggleLike = async (recipeId: number) => {
+    if (userId == null) return;
+    const isLiked = likedIds.has(recipeId);
+    try {
+      await fetch(`${API_URL}/recipe-follows`, {
+        method: isLiked ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json', ...ngrokHeader },
+        body: JSON.stringify({ user_id: userId, recipe_id: recipeId }),
+      });
+      loadData(); // 통계·목록 갱신
+    } catch (e) {
+      console.log('좋아요 토글 에러:', e);
+    }
+  };
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('user');
@@ -72,12 +92,15 @@ export default function MyPage() {
 
           <View style={styles.nameRow}>
             <Text style={styles.name}>{userName || '...'}</Text>
+            <Image source={require('../assets/images/edit.png')} style={styles.editIcon} />
           </View>
 
           <View style={styles.statsBox}>
-            <StatItem label="만든 레시피" value={String(madeRecipes.length)} />
+            <StatItem label="레시피" value={String(stats.recipe_count)} />
             <View style={styles.statDivider} />
-            <StatItem label="좋아요 받은 수" value={String(followedRecipes.length)} />
+            <StatItem label="레시피 도전자" value={String(stats.challenger_count)} />
+            <View style={styles.statDivider} />
+            <StatItem label="좋아요 받은 수" value={String(stats.like_received)} />
           </View>
         </View>
 
@@ -122,8 +145,23 @@ export default function MyPage() {
               >
                 <Text style={styles.recipeTitle}>{recipe.title}</Text>
                 <Text style={styles.recipeDesc} numberOfLines={3}>{recipe.description}</Text>
-                <View style={styles.regionRow}>
-                  <Text style={styles.regionText}>{recipe.region}</Text>
+                <View style={styles.cardFooter}>
+                  <View style={styles.authorRow}>
+                    <Image source={require('../assets/images/profile.png')} style={styles.authorAvatar} />
+                    <Text style={styles.authorName}>{recipe.author ?? recipe.region}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => toggleLike(recipe.id)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Image
+                      source={likedIds.has(recipe.id)
+                        ? require('../assets/images/full_heart.png')
+                        : require('../assets/images/empty_heart.png')}
+                      style={styles.heartIcon}
+                    />
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             ))}
@@ -190,12 +228,19 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     marginTop: 11,
   },
   name: {
     fontFamily: 'NanumHuman-EB',
     fontSize: 20,
     color: '#181818',
+  },
+  editIcon: {
+    width: 22,
+    height: 22,
+    resizeMode: 'contain',
+    tintColor: '#8D8986',
   },
   statsBox: {
     width: '100%',
@@ -285,13 +330,32 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: '#827E7B',
   },
-  regionRow: {
-    marginTop: 12,
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 20,
   },
-  regionText: {
-    fontFamily: 'NanumHuman-Bold',
-    fontSize: 13,
-    color: '#FFA23E',
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  authorAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFEAB4',
+  },
+  authorName: {
+    fontFamily: 'NanumHuman-Regular',
+    fontSize: 16,
+    color: '#595653',
+  },
+  heartIcon: {
+    width: 28,
+    height: 28,
+    resizeMode: 'contain',
   },
   emptyText: {
     fontFamily: 'NanumHuman-Regular',

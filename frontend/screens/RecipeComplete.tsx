@@ -2,7 +2,6 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, ImageBackg
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -13,23 +12,19 @@ export default function RecipeComplete() {
   const recipe = route.params?.recipe ?? null;
 
   useEffect(() => {
-    const saveFollow = async () => {
+    // 따라하기 완료 = 레시피 도전 → 도전자 수(use_count) +1
+    const recordChallenge = async () => {
       try {
         if (!recipe?.id) return;
-        const userStr = await AsyncStorage.getItem('user');
-        const user = userStr ? JSON.parse(userStr) : null;
-        if (user?.id) {
-          await fetch(`${API_URL}/recipe-follows`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
-            body: JSON.stringify({ user_id: user.id, recipe_id: recipe.id }),
-          });
-        }
+        await fetch(`${API_URL}/recipes/${recipe.id}/use`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+        });
       } catch (e) {
-        console.log('따라하기 저장 에러:', e);
+        console.log('도전자 기록 에러:', e);
       }
     };
-    saveFollow();
+    recordChallenge();
   }, []);
 
   const title = recipe

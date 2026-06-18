@@ -277,7 +277,11 @@ async def get_recipe_by_id(recipe_id: int):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT * FROM recipes WHERE id = %s", (recipe_id,))
+        cur.execute("""
+            SELECT r.*, u.user_id AS author
+            FROM recipes r LEFT JOIN users u ON r.user_id = u.id
+            WHERE r.id = %s
+        """, (recipe_id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="레시피를 찾을 수 없어요")
@@ -313,6 +317,47 @@ async def follow_recipe(req: FollowRequest):
         conn.close()
 
 
+@router.delete("/recipe-follows")
+async def unfollow_recipe(req: FollowRequest):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "DELETE FROM recipe_follows WHERE user_id = %s AND recipe_id = %s",
+            (req.user_id, req.recipe_id),
+        )
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"unfollow 에러: {e}")
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.post("/recipes/{recipe_id}/use")
+async def increment_use_count(recipe_id: int):
+    """레시피 따라하기 완료 시 도전자 수(use_count) +1"""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE recipes SET use_count = COALESCE(use_count, 0) + 1 WHERE id = %s",
+            (recipe_id,),
+        )
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"use_count 증가 에러: {e}")
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
 @router.get("/users/{user_id}/recipes/made")
 async def get_made_recipes(user_id: int):
     conn = get_db()
@@ -340,6 +385,64 @@ async def get_followed_recipes(user_id: int):
             WHERE rf.user_id = %s ORDER BY rf.created_at DESC
         """, (user_id,))
         return {"recipes": [serialize_row(r) for r in cur.fetchall()]}
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.get("/users/by-nickname/{nickname}/profile")
+async def get_user_profile_by_nickname(nickname: str):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT id, user_id FROM users WHERE user_id = %s", (nickname,))
+        user = cur.fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없어요")
+        uid = user["id"]
+
+        # 만든 레시피
+        cur.execute("""
+            SELECT r.id, r.title, r.description, r.region, r.duration, r.difficulty, r.created_at,
+                   u.user_id AS author
+            FROM recipes r LEFT JOIN users u ON r.user_id = u.id
+            WHERE r.user_id = %s ORDER BY r.created_at DESC
+        """, (uid,))
+        made = [serialize_row(r) for r in cur.fetchall()]
+
+        # 좋아요 누른 레시피
+        cur.execute("""
+            SELECT r.id, r.title, r.description, r.region, r.duration, r.difficulty, r.created_at,
+                   u.user_id AS author
+            FROM recipes r
+            JOIN recipe_follows rf ON r.id = rf.recipe_id
+            LEFT JOIN users u ON r.user_id = u.id
+            WHERE rf.user_id = %s ORDER BY rf.created_at DESC
+        """, (uid,))
+        liked = [serialize_row(r) for r in cur.fetchall()]
+
+        # 좋아요 받은 수 (내가 만든 레시피들에 달린 좋아요 총합)
+        cur.execute("""
+            SELECT COUNT(*) AS cnt
+            FROM recipe_follows rf JOIN recipes r ON rf.recipe_id = r.id
+            WHERE r.user_id = %s
+        """, (uid,))
+        like_received = cur.fetchone()["cnt"]
+
+        # 레시피 도전자 수 (내 레시피들의 use_count 합)
+        cur.execute("SELECT COALESCE(SUM(use_count), 0) AS cnt FROM recipes WHERE user_id = %s", (uid,))
+        challenger = cur.fetchone()["cnt"]
+
+        return {
+            "user": user,
+            "made": made,
+            "liked": liked,
+            "stats": {
+                "recipe_count": len(made),
+                "challenger_count": challenger,
+                "like_received": like_received,
+            },
+        }
     finally:
         cur.close()
         conn.close()
