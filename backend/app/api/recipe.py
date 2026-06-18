@@ -6,6 +6,7 @@ from typing import Optional
 import os, json
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from app.db import get_conn, put_conn
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
@@ -19,7 +20,7 @@ def serialize_row(row):
     return r
 
 def get_db():
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
+    return get_conn()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -165,7 +166,7 @@ async def save_recipe(req: SaveRecipeRequest):
 
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 @router.get("/get-recipe/{recipe_id}", response_model=RecipeDetail)
 async def get_recipe(recipe_id: int):
@@ -206,7 +207,7 @@ async def get_recipe(recipe_id: int):
     
     finally:
         cursor.close()
-        conn.close()
+        put_conn(conn)
 
 
 @router.get("/recipes")
@@ -231,7 +232,7 @@ async def get_recipes(region: Optional[str] = Query(None)):
         return {"recipes": [serialize_row(r) for r in cur.fetchall()]}
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 
 RECIPE_SELECT = """
@@ -332,7 +333,7 @@ async def get_recommended_recipes(user_id: int):
             return {"recipes": [serialize_row(r) for r in candidates[:10]]}
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 
 @router.get("/recipes/{recipe_id}")
@@ -356,7 +357,7 @@ async def get_recipe_by_id(recipe_id: int):
         return recipe
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 
 @router.post("/recipe-follows")
@@ -377,7 +378,7 @@ async def follow_recipe(req: FollowRequest):
         raise
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 
 @router.delete("/recipe-follows")
@@ -397,7 +398,7 @@ async def unfollow_recipe(req: FollowRequest):
         raise
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 
 @router.post("/recipes/{recipe_id}/use")
@@ -418,7 +419,7 @@ async def increment_use_count(recipe_id: int):
         raise
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 
 @router.get("/users/{user_id}/recipes/made")
@@ -433,7 +434,7 @@ async def get_made_recipes(user_id: int):
         return {"recipes": [serialize_row(r) for r in cur.fetchall()]}
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 
 @router.get("/users/{user_id}/recipes/followed")
@@ -450,7 +451,7 @@ async def get_followed_recipes(user_id: int):
         return {"recipes": [serialize_row(r) for r in cur.fetchall()]}
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 
 @router.get("/users/by-nickname/{nickname}/profile")
@@ -508,4 +509,4 @@ async def get_user_profile_by_nickname(nickname: str):
         }
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)

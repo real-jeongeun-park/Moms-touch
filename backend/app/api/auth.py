@@ -3,11 +3,12 @@ from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
+from app.db import get_conn, put_conn
 
 router = APIRouter()
 
 def get_db():
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
+    return get_conn()
 
 class SignupRequest(BaseModel):
     user_id: str  # 닉네임
@@ -42,7 +43,7 @@ async def signup(req: SignupRequest):
         raise
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 @router.post("/preferences")
 async def save_preferences(req: PreferencesRequest):
@@ -65,7 +66,7 @@ async def save_preferences(req: PreferencesRequest):
         raise
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
 
 @router.post("/auth/login")
 async def login(req: LoginRequest):
@@ -85,4 +86,4 @@ async def login(req: LoginRequest):
         raise
     finally:
         cur.close()
-        conn.close()
+        put_conn(conn)
