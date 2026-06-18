@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { Image, ImageSourcePropType, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { Dimensions } from 'react-native';
 
 type Step = 'region' | 'food' | 'level';
 
+const screenWidth = Dimensions.get('window').width;
 const REGION_STEP = 0;
 const FOOD_STEP = 1;
 const LEVEL_STEP = 2;
 const MAP_BASE_WIDTH = 365;
 const MAP_BASE_HEIGHT = 434;
-const MAP_WIDTH = 300;
+const MAP_WIDTH = screenWidth - 40;
 const MAP_HEIGHT = (MAP_WIDTH * MAP_BASE_HEIGHT) / MAP_BASE_WIDTH;
 const MAP_SCALE = MAP_WIDTH / MAP_BASE_WIDTH;
 
@@ -30,7 +32,17 @@ const REGIONS = [
   { name: '독도',       left: 320, top: 238 },
 ];
 
-const FOODS = ['찌개류', '국, 탕류', '구이류', '볶음류', '면류', '밥류', '디저트류', '해산물', '육류'];
+const FOODS = [
+  { label: '찌개류', image: require('../assets/images/prefer1.png') },
+  { label: '국, 탕류', image: require('../assets/images/prefer2.png') },
+  { label: '구이류', image: require('../assets/images/prefer3.png') },
+  { label: '볶음류', image: require('../assets/images/prefer4.png') },
+  { label: '면류', image: require('../assets/images/prefer5.png') },
+  { label: '밥류', image: require('../assets/images/prefer6.png') },
+  { label: '디저트류', image: require('../assets/images/prefer7.png') },
+  { label: '해산물', image: require('../assets/images/prefer8.png') },
+  { label: '육류', image: require('../assets/images/prefer9.png') },
+];
 
 const LEVELS: { label: string; value: number; image: ImageSourcePropType }[] = [
   { label: '입문', value: 1, image: require('../assets/images/star1.png') },
@@ -127,12 +139,28 @@ export default function OnboardingPreferences() {
           <View style={styles.foodGrid}>
             {FOODS.map(item => (
               <TouchableOpacity
-                key={item}
-                style={[styles.foodCard, food === item && styles.foodCardSelected]}
-                onPress={() => setFood(item)}
+                key={item.label}
+                style={[
+                  styles.foodCard,
+                  food === item.label && styles.foodCardSelected,
+                ]}
+                onPress={() => setFood(item.label)}
                 activeOpacity={0.85}
               >
-                <Text style={[styles.foodText, food === item && styles.foodTextSelected]}>{item}</Text>
+                <Image
+                  source={item.image}
+                  style={styles.foodImage}
+                  resizeMode="contain"
+                />
+
+                <Text
+                  style={[
+                    styles.foodText,
+                    food === item.label && styles.foodTextSelected,
+                  ]}
+                >
+                  {item.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -261,16 +289,20 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingBottom: 20,
   },
-  foodCardSelected: {
-    backgroundColor: '#FFE8BD',
-    borderWidth: 2,
-    borderColor: '#FFA23E',
+  foodImage: {
+  width: 60,
+  height: 60,
   },
   foodText: {
     fontFamily: 'NanumHuman-Bold',
     fontSize: 15,
     color: '#42403D',
     textAlign: 'center',
+  },
+  foodCardSelected: {
+    backgroundColor: '#FFE8BD',
+    borderWidth: 2,
+    borderColor: '#FFA23E',
   },
   foodTextSelected: {
     color: '#FF9019',
