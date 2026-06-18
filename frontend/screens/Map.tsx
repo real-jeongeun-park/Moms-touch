@@ -7,9 +7,8 @@ type ViewMode = 'map' | 'recipes';
 
 const MAP_BASE_WIDTH = 365;
 const MAP_BASE_HEIGHT = 434;
-const MAP_WIDTH = 292;
-const MAP_HEIGHT = (MAP_WIDTH * MAP_BASE_HEIGHT) / MAP_BASE_WIDTH;
-const MAP_SCALE = MAP_WIDTH / MAP_BASE_WIDTH;
+const MAP_ASPECT = MAP_BASE_WIDTH / MAP_BASE_HEIGHT; // 가로/세로 비율
+const MAP_INSET = 16; // 지도가 영역 끝에 딱 붙지 않도록 여백
 
 const REGIONS = [
   { name: '인천', fullName: '인천광역시', left: 70, top: 130 },
@@ -51,12 +50,19 @@ const RECIPES = [
   },
 ];
 
-const scaleMapPosition = (value: number) => value * MAP_SCALE;
-
 export default function Map() {
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [regionPickerOpen, setRegionPickerOpen] = useState(false);
+  const [mapArea, setMapArea] = useState({ width: 0, height: 0 });
+
+  // 남은 영역(mapArea)에 맞춰 지도 크기를 계산. 시트가 뜨면 영역이 줄어 지도가 작아지고 위로 올라간다.
+  const availWidth = Math.max(0, mapArea.width - MAP_INSET * 2);
+  const availHeight = Math.max(0, mapArea.height - MAP_INSET * 2);
+  const mapWidth =
+    availWidth > 0 && availHeight > 0 ? Math.min(availWidth, availHeight * MAP_ASPECT) : 0;
+  const mapHeight = mapWidth / MAP_ASPECT;
+  const mapScale = mapWidth / MAP_BASE_WIDTH;
   const selectedRegionLabel =
     REGIONS.find(region => region.fullName === selectedRegion || region.name === selectedRegion)?.fullName ??
     selectedRegion;
@@ -100,7 +106,17 @@ export default function Map() {
 
       {viewMode === 'map' ? (
         <View style={styles.mapScreen}>
-          <View style={styles.mapWrap}>
+          <View
+            style={styles.mapArea}
+            onLayout={e => {
+              const { width, height } = e.nativeEvent.layout;
+              setMapArea(prev =>
+                prev.width === width && prev.height === height ? prev : { width, height }
+              );
+            }}
+          >
+          {mapWidth > 0 && (
+          <View style={[styles.mapWrap, { width: mapWidth, height: mapHeight }]}>
             <Image
               source={require('../assets/images/map_noword.png')}
               style={styles.mapImage}
@@ -111,7 +127,7 @@ export default function Map() {
                 key={region.fullName}
                 style={[
                   styles.regionBadge,
-                  { left: scaleMapPosition(region.left), top: scaleMapPosition(region.top) },
+                  { left: region.left * mapScale, top: region.top * mapScale },
                   selectedRegion === region.fullName && styles.regionBadgeSelected,
                 ]}
                 onPress={() => selectRegion(region.fullName)}
@@ -127,6 +143,8 @@ export default function Map() {
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+          )}
           </View>
           {selectedRegion && (
           <View style={styles.regionSheet}>
@@ -344,18 +362,20 @@ const styles = StyleSheet.create({
   },
   mapScreen: {
     flex: 1,
-    alignItems: 'center',
     paddingBottom: 12,
   },
+  mapArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   mapWrap: {
-    width: MAP_WIDTH,
-    height: MAP_HEIGHT,
-    marginTop: 58,
+    position: 'relative',
   },
   mapImage: {
     position: 'absolute',
-    width: MAP_WIDTH,
-    height: MAP_HEIGHT,
+    width: '100%',
+    height: '100%',
   },
   regionBadge: {
     position: 'absolute',
@@ -384,10 +404,7 @@ const styles = StyleSheet.create({
     color: '#FF9019',
   },
   regionSheet: {
-    position: 'absolute',
-    left: 18,
-    right: 18,
-    bottom: 0,
+    marginHorizontal: 18,
     minHeight: 210,
     borderRadius: 8,
     backgroundColor: '#F5F5F5',
