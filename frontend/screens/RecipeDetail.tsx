@@ -119,16 +119,14 @@ export default function RecipeDetail() {
         <View style={styles.stepsSection}>
           <Text style={styles.sectionTitle}>레시피</Text>
           <View>
-            <View style={styles.dashedLine} />
-
-            {stepsWithAccTime.map((step: any) => (
+            {stepsWithAccTime.map((step: any, i: number) => (
               <View key={step.id} style={styles.stepRow}>
                 <View style={styles.stepLeft}>
-                  {/* 마지막 단계 아래로는 연결선을 그리지 않음 */}
-                  {i < STEPS.length - 1 && <View style={styles.dashedLine} />}
                   <View style={styles.stepBadge}>
                     <Text style={styles.stepBadgeText}>{step.step_order}</Text>
                   </View>
+                  {/* 마지막 단계 아래로는 연결선을 그리지 않음 */}
+                  {i < stepsWithAccTime.length - 1 && <View style={styles.dashedLine} />}
                 </View>
                 <View style={styles.stepRight}>
                   <Text style={styles.stepTime}>{formatTime(step.accTime)}</Text>
