@@ -88,7 +88,13 @@ export default function RecipeChat() {
 
   const completeChat = () => {
     Keyboard.dismiss();
-    navigation.navigate('RegionSelect');
+    
+    const transcript = messages
+      .filter(m => m.from === 'user')
+      .map(m => m.text)
+      .join(' ');
+
+    navigation.navigate('RegionSelect', { transcript });
   };
 
   return (
@@ -124,7 +130,7 @@ export default function RecipeChat() {
               <View style={styles.introBody}>
           <View style={styles.titleSection}>
             <Text style={styles.title}>재료나 과정을 편하게 적어주세요</Text>
-            <Text style={styles.subtitle}>평소 요리하듯 편하게 말해주세요</Text>
+            <Text style={styles.subtitle}>평소 요리하듯 편하게 알려주세요</Text>
           </View>
 
           <View style={styles.promptArea}>
@@ -184,7 +190,7 @@ export default function RecipeChat() {
                   style={styles.input}
                   value={input}
                   onChangeText={setInput}
-                  placeholder={page === 'intro' ? '평소 요리하듯 편하게 적어주세요' : '가라앉은 전분을 감자에 다시 넣고 반...'}
+                  placeholder={page === 'intro' ? '레시피 이름이 무엇인가요?' : '가라앉은 전분을 감자에 다시 넣고 반...'}
                   placeholderTextColor="#77716D"
                   multiline
                   blurOnSubmit

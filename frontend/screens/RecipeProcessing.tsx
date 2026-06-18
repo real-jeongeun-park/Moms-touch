@@ -2,15 +2,33 @@ import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useEffect } from 'react';
+import { useRoute } from '@react-navigation/native';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function RecipeProcessing() {
   const navigation = useNavigation() as any;
+  const route = useRoute() as any;
+  const { transcript, region } = route.params;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.navigate('RecipeReview');
-    }, 3000);
-    return () => clearTimeout(timer);
+    const generate = async () => {
+      try {
+        const res = await fetch(`${API_URL}/generate-recipe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript, region }),
+        });
+        const data = await res.json();
+        console.log(data);
+        
+        navigation.navigate('RecipeReview', { recipe: data });
+      } catch (e) {
+        console.log('레시피 생성 에러:', e);
+      }
+    };
+
+    generate();
   }, []);
 
   return (

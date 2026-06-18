@@ -27,6 +27,7 @@ const startRecording = async () => {
     }
   };
 
+/*
 const stopAndSend = async () => {
     if (!isRecording) {
       return;
@@ -44,6 +45,17 @@ const stopAndSend = async () => {
     } catch (e) {
       console.log('fetch 에러:', e);
     }
+  };
+
+  */
+
+  const stopAndSend = async () => {
+    if (!isRecording) return;
+    await audioRecorder.stop();
+
+    // 🧪 테스트용 - STT 스킵하고 바로 transcript 넘김
+    const testTranscript = "오늘은 된장찌개 만드는 법을 알려드릴게요. 재료는 된장 두 큰술, 두부 반 모, 애호박 반 개, 감자 하나, 양파 반 개, 대파 조금, 멸치 육수 500밀리리터가 필요해요. 먼저 멸치 육수를 끓이고, 된장을 풀어줘요. 그다음 감자랑 양파를 먼저 넣고 5분 정도 끓이다가 두부랑 애호박 넣고 10분 더 끓이면 돼요. 마지막에 대파 넣고 불 끄면 완성이에요. 30분이면 충분해요.";
+    navigation.navigate('RegionSelect', { transcript: testTranscript });
   };
 
   return (

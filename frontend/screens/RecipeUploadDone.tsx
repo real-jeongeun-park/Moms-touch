@@ -1,12 +1,32 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useEffect } from 'react';
 
 const { width } = Dimensions.get('window');
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+
 export default function RecipeUploadDone() {
   const navigation = useNavigation() as any;
+  const route = useRoute() as any;
+  const recipe = route.params?.recipe;
 
+  useEffect(() => {
+    const save = async () => {
+      try {
+        await fetch(`${API_URL}/save-recipe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(recipe),
+        });
+      } catch (e) {
+        console.log('저장 에러:', e);
+      }
+    };
+    save();
+  }, []);
+  
   return (
     <SafeAreaView style={styles.container}>
 
