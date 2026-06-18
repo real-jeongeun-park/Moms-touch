@@ -25,14 +25,18 @@ export default function Home() {
       try {
         const userStr = await AsyncStorage.getItem('user');
         const user = userStr ? JSON.parse(userStr) : null;
-        if (user) {
-          setUserName(user.user_id);
-          const recRes = await fetch(`${API_URL}/recipes/recommended?user_id=${user.id}`, { headers: { 'ngrok-skip-browser-warning': '1' } });
-          const recData = await recRes.json();
-          setRecommended(recData.recipes ?? []);
-        }
-        const res = await fetch(`${API_URL}/recipes`, { headers: { 'ngrok-skip-browser-warning': '1' } });
-        const data = await res.json();
+        const headers = { 'ngrok-skip-browser-warning': '1' };
+
+        // 추천(사용자 있을 때)과 전체 레시피를 동시에 요청
+        const recPromise = user
+          ? fetch(`${API_URL}/recipes/recommended?user_id=${user.id}`, { headers }).then(r => r.json())
+          : Promise.resolve(null);
+        const allPromise = fetch(`${API_URL}/recipes`, { headers }).then(r => r.json());
+
+        if (user) setUserName(user.user_id);
+        const [recData, data] = await Promise.all([recPromise, allPromise]);
+
+        if (recData) setRecommended(recData.recipes ?? []);
         setRecipes(data.recipes ?? []);
       } catch (err) {
         console.error(err);
