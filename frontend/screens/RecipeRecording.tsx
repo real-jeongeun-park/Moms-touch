@@ -3,6 +3,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { useState } from 'react';
+import { Animated, Easing } from 'react-native';
+import { useEffect, useRef } from 'react';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -11,7 +13,68 @@ export default function RecipeRecording() {
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
 
-const startRecording = async () => {
+  const pulseAnim1 = useRef(new Animated.Value(0)).current;
+  const pulseAnim2 = useRef(new Animated.Value(0)).current;
+  const pulseAnim3 = useRef(new Animated.Value(0)).current;
+
+  // 하나의 물결이 가운데서 시작해 바깥으로 퍼지며 사라지는 루프
+  const createWave = (anim: Animated.Value, delay: number) =>
+    Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+  // 0 -> 1 진행에 따라 커지면서(scale) 옅어짐(opacity)
+  const createScale = (anim: Animated.Value) =>
+    anim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.5, 2.4],
+    });
+
+  const createOpacity = (anim: Animated.Value) =>
+    anim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.6, 0],
+    });
+
+  const scale1 = createScale(pulseAnim1);
+  const scale2 = createScale(pulseAnim2);
+  const scale3 = createScale(pulseAnim3);
+
+  const opacity1 = createOpacity(pulseAnim1);
+  const opacity2 = createOpacity(pulseAnim2);
+  const opacity3 = createOpacity(pulseAnim3);
+
+  useEffect(() => {
+    // 화면에 들어오면 바로 물결을 시차를 두고 계속 퍼지게 한다
+    const wave1 = createWave(pulseAnim1, 0);
+    const wave2 = createWave(pulseAnim2, 600);
+    const wave3 = createWave(pulseAnim3, 1200);
+
+    wave1.start();
+    wave2.start();
+    wave3.start();
+
+    return () => {
+      wave1.stop();
+      wave2.stop();
+      wave3.stop();
+    };
+  }, []);
+
+  const startRecording = async () => {
     const permission = await AudioModule.requestRecordingPermissionsAsync();
     if (!permission.granted) return;
     try {
@@ -27,36 +90,24 @@ const startRecording = async () => {
     }
   };
 
-/*
-const stopAndSend = async () => {
-    if (!isRecording) {
-      return;
-    }
-    await audioRecorder.stop();
-    const uri = audioRecorder.uri;
-
-    const formData = new FormData();
-    formData.append('file', { uri, name: 'recording.m4a', type: 'audio/m4a' } as any);
-
-    try {
-      const res = await fetch(`${API_URL}/speech-to-text`, { method: 'POST', body: formData });
-      const data = await res.json();
-      navigation.navigate('RegionSelect', { transcript: data.text });
-    } catch (e) {
-      console.log('fetch 에러:', e);
-    }
-  };
-
-  */
 
   const stopAndSend = async () => {
     if (!isRecording) return;
+
     await audioRecorder.stop();
 
-    // 🧪 테스트용 - STT 스킵하고 바로 transcript 넘김
-    const testTranscript = "오늘은 된장찌개 만드는 법을 알려드릴게요. 재료는 된장 두 큰술, 두부 반 모, 애호박 반 개, 감자 하나, 양파 반 개, 대파 조금, 멸치 육수 500밀리리터가 필요해요. 먼저 멸치 육수를 끓이고, 된장을 풀어줘요. 그다음 감자랑 양파를 먼저 넣고 5분 정도 끓이다가 두부랑 애호박 넣고 10분 더 끓이면 돼요. 마지막에 대파 넣고 불 끄면 완성이에요. 30분이면 충분해요.";
-    navigation.navigate('RegionSelect', { transcript: testTranscript });
+    // 애니메이션 중지
+    setIsRecording(false);
+
+    // 🧪 테스트용 - STT 스킵
+    const testTranscript =
+    "오늘은 된장찌개 만드는 법을 알려드릴게요. 재료는 된장 두 큰술, 두부 반 모, 애호박 반 개, 감자 하나, 양파 반 개, 대파 조금, 멸치 육수 500밀리리터가 필요해요. 먼저 멸치 육수를 끓이고, 된장을 풀어줘요. 그다음 감자랑 양파를 먼저 넣고 5분 정도 끓이다가 두부랑 애호박 넣고 10분 더 끓이면 돼요. 마지막에 대파 넣고 불 끄면 완성이에요. 30분이면 충분해요.";
+
+    navigation.navigate('RegionSelect', {
+    transcript: testTranscript,
+    });
   };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -74,16 +125,52 @@ const stopAndSend = async () => {
 
       {/* 마이크 버튼 (녹음 중 상태) */}
       <View style={styles.micWrapper}>
-        <TouchableOpacity onPress={startRecording}>
-          <View style={styles.micOuter}>
-            <View style={styles.glowOuter} />
-            <View style={styles.glowMiddle} />
-            <View style={styles.micCircle}>
-              <Image source={require('../assets/images/record_ing.png')} style={styles.micIcon} />
-            </View>
-          </View>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        onPress={!isRecording ? startRecording : undefined}
+        activeOpacity={0.8}
+      >
+        <View style={styles.micOuter}>
+          {isRecording && (
+            <>
+              <Animated.View
+                style={[
+                  styles.wave,
+                  {
+                    opacity: opacity1,
+                    transform: [{ scale: scale1 }],
+                  },
+                ]}
+              />
+
+              <Animated.View
+                style={[
+                  styles.wave,
+                  {
+                    opacity: opacity2,
+                    transform: [{ scale: scale2 }],
+                  },
+                ]}
+              />
+
+              <Animated.View
+                style={[
+                  styles.wave,
+                  {
+                    opacity: opacity3,
+                    transform: [{ scale: scale3 }],
+                  },
+                ]}
+              />
+            </>
+          )}
+
+          <Image
+            source={require('../assets/images/record_img.png')}
+            style={styles.recordButton}
+          />
+        </View>
+      </TouchableOpacity>
+    </View>
 
       {/* 하단 버튼 */}
       <View style={styles.bottomBar}>
@@ -110,18 +197,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 16, color: '#8D8986', textAlign: 'center' },
 
   micWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  micOuter: { width: 180, height: 180, justifyContent: 'center', alignItems: 'center' },
 
-  glowOuter: {
-    position: 'absolute',
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: '#FFCA45', opacity: 0.1,
-  },
-  glowMiddle: {
-    position: 'absolute',
-    width: 133, height: 133, borderRadius: 67,
-    backgroundColor: '#FFCA45', opacity: 0.2,
-  },
   micCircle: {
     width: 98, height: 98, borderRadius: 100,
     backgroundColor: '#FF9019',
@@ -135,4 +211,26 @@ const styles = StyleSheet.create({
     height: 60, justifyContent: 'center', alignItems: 'center',
   },
   endBtnText: { fontSize: 22, fontWeight: '700', color: '#FFFFFF' },
+ 
+  micOuter: {
+  width: 220,
+  height: 220,
+  justifyContent: 'center',
+  alignItems: 'center',
+  },
+
+  wave: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 999,
+    borderWidth: 3,
+    borderColor: '#FFB23E',
+  },
+
+  recordButton: {
+    width: 100,
+    height: 100,
+    resizeMode: 'contain',
+  },
 });
