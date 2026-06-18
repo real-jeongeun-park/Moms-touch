@@ -92,14 +92,32 @@ async def generate_recipe(req: RecipeRequest):
         2) druation은 전체 예상 소요 시간이므로 각 step의 timestamp를 모두 더한 값이 되어야 해.
         """
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            response_format={"type": "json_object"},
+        )
+    except Exception as e:
+        print(f"OpenAI 호출 에러: {e}")
+        raise HTTPException(status_code=502, detail=f"AI 응답 생성에 실패했어요: {e}")
 
     raw = response.choices[0].message.content.strip()
-    result = json.loads(raw)
+
+    # 혹시 ```json ... ``` 코드펜스로 감싸 오면 벗겨낸다
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.lstrip().lower().startswith("json"):
+            raw = raw.lstrip()[4:]
+        raw = raw.strip()
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"JSON 파싱 에러: {e}\n원본 응답: {raw}")
+        raise HTTPException(status_code=502, detail="AI가 올바른 형식으로 응답하지 않았어요. 다시 시도해 주세요.")
+
     result["region"] = req.region
     return result
 

@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Easing, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useEffect, useRef, useState } from 'react';
@@ -91,12 +91,19 @@ export default function RecipeProcessing() {
           headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
           body: JSON.stringify({ transcript, region }),
         });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`서버 오류 (${res.status}): ${errText}`);
+        }
         const data = await res.json();
         console.log(data);
-        
+
         navigation.navigate('RecipeReview', { recipe: data });
       } catch (e) {
         console.log('레시피 생성 에러:', e);
+        Alert.alert('레시피 생성 실패', '레시피를 만드는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.', [
+          { text: '확인', onPress: () => navigation.goBack() },
+        ]);
       }
     };
 

@@ -27,8 +27,6 @@ export default function RecipeReview() {
     return `${m}:00`;
   };
 
-  let accumulated = 0;
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 180 }}>
@@ -82,18 +80,19 @@ export default function RecipeReview() {
         <View style={styles.stepsSection}>
           <Text style={styles.sectionTitle}>레시피</Text>
           <View>
-            <View style={styles.dashedLine} />
               {(() => {
                 let accumulated = 0;
-                return recipe.steps.map((step: any) => {
+                return recipe.steps.map((step: any, index: number) => {
                   const current = accumulated
                   accumulated += Number(step.timestamp);
+                  const isLast = index === recipe.steps.length - 1;
                   return (
                     <View key={step.step_order} style={styles.stepRow}>
                       <View style={styles.stepLeft}>
                         <View style={styles.stepBadge}>
                           <Text style={styles.stepBadgeText}>{step.step_order}</Text>
                         </View>
+                        {!isLast && <View style={styles.dashedLine} />}
                       </View>
                       <View style={styles.stepRight}>
                         <Text style={styles.stepTime}>{formatTime(current)}</Text>
@@ -155,7 +154,7 @@ const styles = StyleSheet.create({
 
   stepsSection: { paddingHorizontal: 28, paddingTop: 20 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#181818', marginBottom: 20 },
-  dashedLine: { position: 'absolute', left: 9, top: 0, bottom: 0, width: 2, borderStyle: 'dashed', borderLeftWidth: 2, borderColor: '#FFD8AF' },
+  dashedLine: { position: 'absolute', top: 20, bottom: -12, left: 9, width: 2, borderStyle: 'dashed', borderLeftWidth: 2, borderColor: '#FFD8AF' },
 
   stepRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   stepLeft: { width: 20, alignItems: 'center', zIndex: 1 },

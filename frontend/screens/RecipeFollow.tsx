@@ -209,11 +209,12 @@ export default function RecipeFollow() {
 
         {/* 타임라인 */}
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 40, paddingBottom: 40 }}>
-          <View style={{ position: 'relative' }}>
-            <View style={styles.dashedLine} />
+          <View style={{ position: 'relative', paddingLeft: 4 }}>
             {steps.map((s: any, i: number) => (
               <View key={s.id} style={styles.timelineRow}>
                 <View style={styles.timelineLeft}>
+                  {/* 마지막 단계 아래로는 연결선을 그리지 않음 */}
+                  {i < steps.length - 1 && <View style={styles.dashedLine} />}
                   <View style={[styles.timelineBadge, i === currentStep && styles.timelineBadgeActive]}>
                     <Text style={styles.timelineBadgeText}>{s.id}</Text>
                   </View>
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#E6E6E6', marginBottom: 10 },
   sheetTitle: { fontSize: 14, fontWeight: '700', color: '#181818', alignSelf: 'flex-start' },
 
-  dashedLine: { position: 'absolute', left: 9, top: 0, bottom: 0, width: 2, borderStyle: 'dashed', borderLeftWidth: 2, borderColor: '#FFD8AF' },
+  dashedLine: { position: 'absolute', left: 9, top: 20, bottom: -12, width: 2, borderStyle: 'dashed', borderLeftWidth: 2, borderColor: '#FFD8AF' },
   timelineRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   timelineLeft: { width: 20, alignItems: 'center', zIndex: 1 },
   timelineBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFCA45', justifyContent: 'center', alignItems: 'center' },

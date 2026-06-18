@@ -77,7 +77,7 @@ export default function MyPage() {
           <View style={styles.statsBox}>
             <StatItem label="만든 레시피" value={String(madeRecipes.length)} />
             <View style={styles.statDivider} />
-            <StatItem label="따라해본 레시피" value={String(followedRecipes.length)} />
+            <StatItem label="좋아요 받은 수" value={String(followedRecipes.length)} />
           </View>
         </View>
 
@@ -99,7 +99,7 @@ export default function MyPage() {
             activeOpacity={0.8}
           >
             <Text style={[styles.tabText, activeTab === 'followed' && styles.tabTextActive]}>
-              따라해본 레시피
+              좋아요 누른 레시피
             </Text>
             {activeTab === 'followed' && <View style={styles.tabIndicator} />}
           </TouchableOpacity>
@@ -109,7 +109,7 @@ export default function MyPage() {
           <ActivityIndicator color="#FF9019" style={{ marginTop: 32 }} />
         ) : displayRecipes.length === 0 ? (
           <Text style={styles.emptyText}>
-            {activeTab === 'made' ? '아직 올린 레시피가 없어요' : '아직 따라해본 레시피가 없어요'}
+            {activeTab === 'made' ? '아직 올린 레시피가 없어요' : '아직 좋아요 누른 레시피가 없어요'}
           </Text>
         ) : (
           <View style={styles.cardList}>

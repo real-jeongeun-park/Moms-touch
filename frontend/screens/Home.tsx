@@ -95,25 +95,21 @@ export default function Home() {
         {/* 인기 레시피 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>인기레시피</Text>
-          {loading ? (
-            <ActivityIndicator color="#FF9019" style={{ marginTop: 24 }} />
-          ) : recipes.length === 0 ? (
-            <Text style={styles.emptyText}>아직 등록된 레시피가 없어요</Text>
-          ) : (
-            recipes.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.recipeCard}
-                onPress={() => navigation.navigate('RecipeDetail', { recipe_id: item.id })}
-              >
-                <Text style={styles.recipeTitle}>{item.title}</Text>
-                <Text style={styles.recipeDesc} numberOfLines={2}>{item.description}</Text>
-                <View style={styles.recipeFooter}>
+          {recipes.map(item => (
+            <TouchableOpacity key={item.id} style={styles.recipeCard} onPress={() => navigation.navigate('RecipeDetail', { recipe_id: item.id })}>
+              <Text style={styles.recipeTitle}>{item.title}</Text>
+              <Text style={styles.recipeDesc}>{item.description}</Text>
+              <View style={styles.recipeFooter}>
+                <TouchableOpacity
+                  style={styles.authorTap}
+                  onPress={() => navigation.navigate('UserProfile', { name: item.author })}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.avatar} />
                   <Text style={styles.recipeAuthor}>{item.author ?? item.region}</Text>
-                </View>
-              </TouchableOpacity>
-            ))
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -164,6 +160,7 @@ const styles = StyleSheet.create({
   recipeTitle: { fontSize: 17, fontWeight: '800', color: '#181818', marginBottom: 4 },
   recipeDesc: { fontSize: 14, color: '#827E7B', lineHeight: 21, marginBottom: 12 },
   recipeFooter: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  authorTap: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   avatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F3F3F3' },
   recipeAuthor: { fontSize: 14, color: '#181818' },
   emptyText: { fontSize: 14, color: '#9B9794', textAlign: 'center', paddingVertical: 24 },

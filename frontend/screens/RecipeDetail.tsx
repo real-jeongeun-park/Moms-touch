@@ -123,14 +123,14 @@ export default function RecipeDetail() {
         <View style={styles.stepsSection}>
           <Text style={styles.sectionTitle}>레시피</Text>
           <View>
-            <View style={styles.dashedLine} />
-
-            {stepsWithAccTime.map((step: any) => (
+            {stepsWithAccTime.map((step: any, i: number) => (
               <View key={step.id} style={styles.stepRow}>
                 <View style={styles.stepLeft}>
                   <View style={styles.stepBadge}>
                     <Text style={styles.stepBadgeText}>{step.step_order}</Text>
                   </View>
+                  {/* 마지막 단계 아래로는 연결선을 그리지 않음 */}
+                  {i < stepsWithAccTime.length - 1 && <View style={styles.dashedLine} />}
                 </View>
                 <View style={styles.stepRight}>
                   <Text style={styles.stepTime}>{formatTime(step.accTime)}</Text>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   // 레시피 단계
   stepsSection: { paddingHorizontal: 28, paddingTop: 20 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#181818', marginBottom: 20 },
-  dashedLine: { position: 'absolute', left: 9, top: 0, bottom: 0, width: 2, borderStyle: 'dashed', borderLeftWidth: 2, borderColor: '#FFD8AF' },
+  dashedLine: { position: 'absolute', left: 9, top: 20, bottom: -12, width: 2, borderStyle: 'dashed', borderLeftWidth: 2, borderColor: '#FFD8AF' },
 
   stepRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   stepLeft: { width: 20, alignItems: 'center', zIndex: 1 },
