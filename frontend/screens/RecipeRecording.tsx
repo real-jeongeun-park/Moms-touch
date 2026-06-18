@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync } from 'expo-audio';
@@ -76,7 +76,17 @@ export default function RecipeRecording() {
 
   const startRecording = async () => {
     const permission = await AudioModule.requestRecordingPermissionsAsync();
-    if (!permission.granted) return;
+    if (!permission.granted) {
+      Alert.alert(
+        '마이크 권한이 필요해요',
+        '레시피를 녹음하려면 마이크 접근을 허용해 주세요. 설정에서 권한을 켤 수 있어요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '설정 열기', onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
+    }
     try {
       await setAudioModeAsync({
         allowsRecording: true,
@@ -87,6 +97,7 @@ export default function RecipeRecording() {
       setIsRecording(true);
     } catch (e) {
       console.log('녹음 에러:', e);
+      Alert.alert('녹음을 시작할 수 없어요', String(e));
     }
   };
 

@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { Image, ImageSourcePropType, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Dimensions } from 'react-native';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 type Step = 'region' | 'food' | 'level';
 
@@ -26,7 +29,7 @@ const REGIONS = [
   { name: '충청남도',   left: 95,  top: 185 },
   { name: '전라북도',   left: 105, top: 242 },
   { name: '경상남도',   left: 191, top: 267 },
-  { name: '전라남도',   left: 100, top: 295 },
+  { name: '전라도',     left: 100, top: 295 },
   { name: '제주도',     left: 100,  top: 375 },
   { name: '울릉도',     left: 314, top: 150 },
   { name: '독도',       left: 320, top: 238 },
@@ -78,16 +81,29 @@ export default function OnboardingPreferences() {
     setStepIndex(current => current - 1);
   };
 
-  const goNext = () => {
-    if (!canContinue) {
-      return;
-    }
+  const goNext = async () => {
+    if (!canContinue) return;
 
     if (stepIndex === LEVEL_STEP) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Main' }],
-      });
+      try {
+        const userStr = await AsyncStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (user && region && food && level) {
+          await fetch(`${API_URL}/preferences`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+            body: JSON.stringify({
+              user_id: user.id,
+              preferred_region: region,
+              preferred_food_type: food,
+              preferred_difficulty: level,
+            }),
+          });
+        }
+      } catch (e) {
+        console.log('선호도 저장 에러:', e);
+      }
+      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
       return;
     }
 

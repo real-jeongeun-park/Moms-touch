@@ -1,21 +1,50 @@
-import { View, Text, ScrollView, TextInput, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TextInput, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const recipes = [
-  { id: 1, title: '고들빼기김치', desc: '쌉싸름한 고들빼기에 젓갈 양념을 더한 김치', author: '인자 할머니', done: false },
-  { id: 2, title: '고들빼기김치', desc: '쌉싸름한 고들빼기에 젓갈 양념을 더한 김치', author: '인자 할머니', done: true },
-  { id: 3, title: '고들빼기김치', desc: '쌉싸름한 고들빼기에 젓갈 양념을 더한 김치', author: '인자 할머니', done: false },
-];
-
-const ranks = [
-  { id: 1, rank: '취향저격\n1위', title: '강원도 감자옹심이', desc: '감자로 빚어 따뜻하게 만든 옹심이', color: '#FF9019', medal: require('../assets/images/gold_medal.png') },
-  { id: 2, rank: '취향저격\n2위', title: '전라도 고들빼기김치', desc: '전라도 고들빼기에 젓갈 양념을 더한 김치', color: '#73ADFF', medal: require('../assets/images/silver_medal.png') },
-  { id: 3, rank: '취향저격\n3위', title: '경상도 동태찌개', desc: '칼칼하고 시원한 동태찌개', color: '#FFCA45', medal: require('../assets/images/bronze_medal.png') },
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+const RANK_COLORS = ['#FF9019', '#73ADFF', '#FFCA45'];
+const RANK_LABELS = ['취향저격\n1위', '취향저격\n2위', '취향저격\n3위'];
+const RANK_MEDALS = [
+  require('../assets/images/gold_medal.png'),
+  require('../assets/images/silver_medal.png'),
+  require('../assets/images/bronze_medal.png'),
 ];
 
 export default function Home() {
-      const navigation = useNavigation() as any;
+  const navigation = useNavigation() as any;
+  const [recipes, setRecipes] = useState<any[]>([]);
+  const [recommended, setRecommended] = useState<any[]>([]);
+  const [userName, setUserName] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (user) {
+          setUserName(user.user_id);
+          const recRes = await fetch(`${API_URL}/recipes/recommended?user_id=${user.id}`, { headers: { 'ngrok-skip-browser-warning': '1' } });
+          const recData = await recRes.json();
+          setRecommended(recData.recipes ?? []);
+        }
+        const res = await fetch(`${API_URL}/recipes`, { headers: { 'ngrok-skip-browser-warning': '1' } });
+        const data = await res.json();
+        setRecipes(data.recipes ?? []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const topRecipes = recommended.length > 0 ? recommended.slice(0, 3) : recipes.slice(0, 3);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -35,41 +64,50 @@ export default function Home() {
         </View>
 
         {/* 취향저격 순위 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>홍길동님이 좋아하실만한 손맛</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.rankRow}>
-              {ranks.map(item => (
-                <View key={item.id} style={styles.rankCard}>
-                  <View style={[styles.rankCardTop, { backgroundColor: item.color }]}>
-                    <Text style={styles.rankLabel}>{item.rank}</Text>
-                    <Image source={item.medal} style={styles.medalImage} />
-                  </View>
-                  <View style={styles.rankCardBottom}>
-                    <Text style={styles.rankTitle}>{item.title}</Text>
-                    <Text style={styles.rankDesc}>{item.desc}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
+        {topRecipes.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {recommended.length > 0 && userName ? `${userName}님 취향저격 TOP 3` : '인기 손맛 TOP 3'}
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.rankRow}>
+                {topRecipes.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.rankCard}
+                    onPress={() => navigation.navigate('RecipeDetail', { recipe_id: item.id })}
+                  >
+                    <View style={[styles.rankCardTop, { backgroundColor: RANK_COLORS[index] }]}>
+                      <Text style={styles.rankLabel}>{RANK_LABELS[index]}</Text>
+                      <Image source={RANK_MEDALS[index]} style={styles.medalImage} />
+                    </View>
+                    <View style={styles.rankCardBottom}>
+                      <Text style={styles.rankTitle}>{item.title}</Text>
+                      <Text style={styles.rankDesc} numberOfLines={2}>{item.description}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
 
         {/* 인기 레시피 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>인기레시피</Text>
           {recipes.map(item => (
-            <TouchableOpacity key={item.id} style={styles.recipeCard} onPress={() => navigation.navigate('RecipeDetail', { recipe_id: 1 })}>
+            <TouchableOpacity key={item.id} style={styles.recipeCard} onPress={() => navigation.navigate('RecipeDetail', { recipe_id: item.id })}>
               <Text style={styles.recipeTitle}>{item.title}</Text>
-              <Text style={styles.recipeDesc}>{item.desc}</Text>
+              <Text style={styles.recipeDesc}>{item.description}</Text>
               <View style={styles.recipeFooter}>
-                <View style={styles.avatar} />
-                <Text style={styles.recipeAuthor}>{item.author}</Text>
-                {item.done && (
-                  <View style={styles.doneBadge}>
-                    <Text style={styles.doneText}>완료</Text>
-                  </View>
-                )}
+                <TouchableOpacity
+                  style={styles.authorTap}
+                  onPress={() => navigation.navigate('UserProfile', { name: item.author })}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.avatar} />
+                  <Text style={styles.recipeAuthor}>{item.author ?? item.region}</Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           ))}
@@ -122,11 +160,8 @@ const styles = StyleSheet.create({
   recipeTitle: { fontSize: 17, fontWeight: '800', color: '#181818', marginBottom: 4 },
   recipeDesc: { fontSize: 14, color: '#827E7B', lineHeight: 21, marginBottom: 12 },
   recipeFooter: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  authorTap: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   avatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F3F3F3' },
   recipeAuthor: { fontSize: 14, color: '#181818' },
-  doneBadge: {
-    backgroundColor: '#FFA23E', borderRadius: 50,
-    paddingHorizontal: 10, paddingVertical: 6, marginLeft: 'auto',
-  },
-  doneText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
+  emptyText: { fontSize: 14, color: '#9B9794', textAlign: 'center', paddingVertical: 24 },
 });

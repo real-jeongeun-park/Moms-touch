@@ -5,19 +5,19 @@ import { useState } from 'react';
 
 // left, top = 365x434 기준 배지 좌측 상단 위치
 const REGIONS = [
-  { name: '인천광역시', left: 70,   top: 130 },
-  { name: '경기도',     left: 112, top: 78  },
-  { name: '강원도',     left: 182, top: 82  },
-  { name: '서울특별시', left: 105,  top: 105 },
-  { name: '충청북도',   left: 142, top: 160 },
-  { name: '경상북도',   left: 211, top: 190 },
-  { name: '충청남도',   left: 95,  top: 185 },
-  { name: '전라북도',   left: 105, top: 242 },
-  { name: '경상남도',   left: 191, top: 267 },
-  { name: '전라남도',   left: 100, top: 295 },
-  { name: '제주도',     left: 100,  top: 375 },
-  { name: '울릉도',     left: 314, top: 150 },
-  { name: '독도',       left: 320, top: 238 },
+  { name: '인천',   fullName: '인천광역시', left: 70,  top: 130 },
+  { name: '경기도', fullName: '경기도',     left: 112, top: 78  },
+  { name: '강원도', fullName: '강원도',     left: 182, top: 82  },
+  { name: '서울',   fullName: '서울특별시', left: 105, top: 105 },
+  { name: '충북',   fullName: '충청북도',   left: 142, top: 160 },
+  { name: '경북',   fullName: '경상북도',   left: 211, top: 190 },
+  { name: '충남',   fullName: '충청남도',   left: 95,  top: 185 },
+  { name: '전북',   fullName: '전라북도',   left: 105, top: 242 },
+  { name: '경남',   fullName: '경상남도',   left: 191, top: 267 },
+  { name: '전라도', fullName: '전라도',     left: 100, top: 295 },
+  { name: '제주도', fullName: '제주도',     left: 100, top: 375 },
+  { name: '울릉도', fullName: '울릉도',     left: 314, top: 150 },
+  { name: '독도',   fullName: '독도',       left: 320, top: 238 },
 ];
 
 export default function RegionSelect() {
@@ -50,16 +50,16 @@ export default function RegionSelect() {
           />
           {REGIONS.map(r => (
             <TouchableOpacity
-              key={r.name}
+              key={r.fullName}
               style={[
                 styles.badge,
                 { left: r.left, top: r.top },
-                selected === r.name && styles.badgeSelected,
+                selected === r.fullName && styles.badgeSelected,
               ]}
-              onPress={() => setSelected(r.name)}
+              onPress={() => setSelected(r.fullName)}
               activeOpacity={0.75}
             >
-              <Text style={[styles.badgeText, selected === r.name && styles.badgeTextSelected]}>
+              <Text style={[styles.badgeText, selected === r.fullName && styles.badgeTextSelected]}>
                 {r.name}
               </Text>
             </TouchableOpacity>
@@ -73,7 +73,7 @@ export default function RegionSelect() {
           style={styles.confirmBtn}
           onPress={() => navigation.navigate('RecipeProcessing', {
             transcript,
-            region: selected,
+            region: selected ?? '',
           })}
         >
           <Text style={styles.confirmBtnText}>레시피 완성하기</Text>

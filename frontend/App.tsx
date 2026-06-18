@@ -3,8 +3,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Image } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Home from './screens/Home';
 import RecipeCreate from './screens/RecipeCreate';
 import Map from './screens/Map';
@@ -21,8 +22,17 @@ import RecipeProcessing from './screens/RecipeProcessing';
 import RecipeReview from './screens/RecipeReview';
 import RecipeUploadDone from './screens/RecipeUploadDone';
 import OnboardingPreferences from './screens/OnboardingPreferences';
+import ProfileSetup from './screens/ProfileSetup';
+import UserProfile from './screens/UserProfile';
 
 SplashScreen.preventAutoHideAsync();
+
+// ngrok 브라우저 경고 페이지 우회
+const _originalFetch = global.fetch;
+(global as any).fetch = (url: RequestInfo | URL, options?: RequestInit) => {
+  const headers = { 'ngrok-skip-browser-warning': '1', ...(options?.headers ?? {}) };
+  return _originalFetch(url as any, { ...options, headers });
+};
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -67,16 +77,26 @@ export default function App() {
     'NanumHuman-Bold': require('./assets/fonts/NanumHumanBold.ttf'),
     'NanumHuman-EB': require('./assets/fonts/NanumHumanEB.ttf'),
   });
+  const [initialRoute, setInitialRoute] = useState<string | null>(null);
 
   useEffect(() => {
-    if (loaded) { SplashScreen.hideAsync(); }
-  }, [loaded]);
+    const check = async () => {
+      const userStr = await AsyncStorage.getItem('user');
+      setInitialRoute(userStr ? 'Main' : 'ProfileSetup');
+    };
+    check();
+  }, []);
 
-  if (!loaded) { return null; }
+  useEffect(() => {
+    if (loaded && initialRoute) { SplashScreen.hideAsync(); }
+  }, [loaded, initialRoute]);
+
+  if (!loaded || !initialRoute) { return null; }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="OnboardingPreferences" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="ProfileSetup" component={ProfileSetup} />
         <Stack.Screen name="OnboardingPreferences" component={OnboardingPreferences} />
         <Stack.Screen name="Main" component={TabNavigator} />
         <Stack.Screen name="RecipeDetail" component={RecipeDetail} />
@@ -90,6 +110,7 @@ export default function App() {
         <Stack.Screen name="RecipeProcessing" component={RecipeProcessing} />
         <Stack.Screen name="RecipeReview" component={RecipeReview} />
         <Stack.Screen name="RecipeUploadDone" component={RecipeUploadDone} />
+        <Stack.Screen name="UserProfile" component={UserProfile} />
       </Stack.Navigator>
     </NavigationContainer>
   );
