@@ -1,6 +1,9 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useState, useEffect } from 'react';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const starImages: Record<number, any> = {
   1: require('../assets/images/star1.png'),
@@ -10,38 +13,53 @@ const starImages: Record<number, any> = {
   5: require('../assets/images/star5.png'),
 };
 
-const STEPS = [
-  { id: 1, time: '00:00', title: '재료 준비', desc: '감자, 애호박, 양파, 대파를 준비하고 감자는 껍질을 벗겨둡니다. 감자는 갈기 좋게 작게 잘라두면 좋아요.' },
-  { id: 2, time: '05:00', title: '감자 갈기', desc: '손질된 감자를 강판이나 믹서기로 곱게 갈아줍니다. 갈아낸 감자의 물을 살짝 따라 내어 농도를 맞춰두세요.' },
-  { id: 3, time: '12:00', title: '육수 끓이기 및 채소 가닥하기', desc: '다시마를 물에 넣고 끓이다가 멸치를 넣어 육수를 내세요. 애호박과 양파, 대파를 먹기 좋게 잘라두세요.' },
-  { id: 4, time: '22:00', title: '반죽 만들기', desc: '갈아둔 감자에 전분가루와 전분을 넣고 농도가 맞게 섞어 반죽을 만들어 주세요. 소금으로 간을 해 두면 좋아요.' },
-  { id: 5, time: '28:00', title: '옹심이 빚기', desc: '완성된 반죽을 둥글게 동글동글하게 빚어두세요. 손가락으로 꾹 눌러 균형을 맞추어 나이의 옹심이를 빚어두세요.' },
-  { id: 6, time: '35:00', title: '육수 끓이기', desc: '끓여진 다시마 육수에 채소를 넣고 끓여주세요. 육수가 다시 끓으면 빚어둔 옹심이를 넣어 주세요.' },
-  { id: 7, time: '40:00', title: '옹심이 넣기', desc: '옹심이가 끓어오르면 떠오르는 것들이 조리 중이에요. 소금으로 간을 맞추고 파의 향이 올라올 때까지 좋아요.' },
-  { id: 8, time: '47:00', title: '담고 마무리 하기', desc: '끓여진 감자옹심이를 그릇에 담고 파를 올려 마무리해주세요. 따뜻하게 드시면 가장 맛있어요.' },
-];
-
-const DIFFICULTY = 3;
-
-const INFO = [
-  { label: '지역', value: '강원도', type: 'text' },
-  { label: '소요 시간', value: '50분', type: 'text' },
-  { label: '난이도', value: DIFFICULTY, type: 'star' },
-];
-
-const INGREDIENTS = [
-  { name: '감자', amount: '4개' },
-  { name: '감자전분', amount: '1작은술' },
-  { name: '국장', amount: '1큰술' },
-  { name: '김치전분', amount: '3큰술' },
-  { name: '소금', amount: '약간' },
-  { name: '애호박', amount: '1/3개' },
-];
-
 export default function RecipeDetail() {
   const navigation = useNavigation() as any;
   const route = useRoute() as any;
-  const recipe = route.params?.recipe;
+  const { recipe_id } = route.params;
+
+  const [recipe, setRecipe] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecipe = async () => {
+      try {
+        const res = await fetch(`${API_URL}/get-recipe/${recipe_id}`);
+        if (!res.ok) throw new Error('fetch 실패');
+        const data = await res.json();
+        setRecipe(data);
+      } catch (e) {
+        console.error('레시피 불러오기 실패:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRecipe();
+  }, [recipe_id]);
+
+  if (loading) return (
+    <SafeAreaView style={styles.container}>
+      <ActivityIndicator size="large" color="#FFA23E" style={{ marginTop: 100 }} />
+    </SafeAreaView>
+  );
+
+  if (!recipe) return (
+    <SafeAreaView style={styles.container}>
+      <Text style={{ textAlign: 'center', marginTop: 100, color: '#827E7B' }}>레시피를 불러올 수 없어요</Text>
+    </SafeAreaView>
+  );
+
+  const formatTime = (min?: number) => {
+    if (min == null) return '00:00';
+    const m = Math.floor(min).toString().padStart(2, '0');
+    const s = '00';
+    return `${m}:${s}`;
+  };
+
+  const stepsWithAccTime = recipe.steps.reduce((acc: any[], step: any, i: number) => {
+    const prev = i === 0 ? 0 : acc[i - 1].accTime;
+    return [...acc, { ...step, accTime: prev + (step.timestamp ?? 0) }];
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -52,40 +70,45 @@ export default function RecipeDetail() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backIcon}>‹</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.searchBtn}>
-            <Image source={require('../assets/images/find_btn.png')} style={styles.searchIcon} />
-          </TouchableOpacity>
         </View>
 
         {/* 제목 영역 */}
         <View style={styles.titleSection}>
-          <Text style={styles.title}>{recipe?.title ?? '강원도 감자옹심이'}</Text>
-          <Text style={styles.subtitle}>{recipe?.desc ?? '감자로 빚어낸 투박하고 따뜻한 한 그릇'}</Text>
+          <Text style={styles.title}>{recipe.title}</Text>
+          <Text style={styles.subtitle}>{recipe.description}</Text>
 
           {/* 정보 */}
           <View style={styles.infoBox}>
-            {INFO.map(item => (
-              <View key={item.label} style={styles.infoRow}>
-                <Text style={styles.infoLabel}>{item.label}</Text>
-                {item.type === 'star'
-                  ? <Image source={starImages[item.value as number]} style={styles.starImage} />
-                  : <Text style={styles.infoValue}>{item.value}</Text>
-                }
-              </View>
-            ))}
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>지역</Text>
+              <Text style={styles.infoValue}>{recipe.region ?? '-'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>소요 시간</Text>
+              <Text style={styles.infoValue}>{recipe.duration ? `${recipe.duration}분` : '-'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>난이도</Text>
+              {recipe.difficulty
+                ? <Image source={starImages[recipe.difficulty]} style={styles.starImage} />
+                : <Text style={styles.infoValue}>-</Text>
+              }
+            </View>
 
             {/* 재료 */}
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>재료</Text>
-              <View style={styles.ingredientRow}>
-                {INGREDIENTS.map(ing => (
-                  <View key={ing.name} style={styles.ingredientItem}>
-                    <Text style={styles.ingName}>{ing.name}</Text>
-                    <Text style={styles.ingAmount}>{ing.amount}</Text>
-                  </View>
-                ))}
+            {recipe.ingredients?.length > 0 && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>재료</Text>
+                <View style={styles.ingredientRow}>
+                  {recipe.ingredients.map((ing: any) => (
+                    <View key={ing.name} style={styles.ingredientItem}>
+                      <Text style={styles.ingName}>{ing.name}</Text>
+                      <Text style={styles.ingAmount}>{ing.amount}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
           </View>
         </View>
 
@@ -96,20 +119,22 @@ export default function RecipeDetail() {
         <View style={styles.stepsSection}>
           <Text style={styles.sectionTitle}>레시피</Text>
           <View>
-            {STEPS.map((step, i) => (
+            <View style={styles.dashedLine} />
+
+            {stepsWithAccTime.map((step: any) => (
               <View key={step.id} style={styles.stepRow}>
                 <View style={styles.stepLeft}>
                   {/* 마지막 단계 아래로는 연결선을 그리지 않음 */}
                   {i < STEPS.length - 1 && <View style={styles.dashedLine} />}
                   <View style={styles.stepBadge}>
-                    <Text style={styles.stepBadgeText}>{step.id}</Text>
+                    <Text style={styles.stepBadgeText}>{step.step_order}</Text>
                   </View>
                 </View>
                 <View style={styles.stepRight}>
-                  <Text style={styles.stepTime}>{step.time}</Text>
+                  <Text style={styles.stepTime}>{formatTime(step.accTime)}</Text>
                   <View style={styles.stepCard}>
                     <Text style={styles.stepTitle}>{step.title}</Text>
-                    <Text style={styles.stepDesc}>{step.desc}</Text>
+                    <Text style={styles.stepDesc}>{step.description}</Text>
                   </View>
                 </View>
               </View>
@@ -121,7 +146,10 @@ export default function RecipeDetail() {
 
       {/* 하단 버튼 */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.startBtn} onPress={() => navigation.navigate('RecipeStart', { recipe })}>
+        <TouchableOpacity
+          style={styles.startBtn}
+          onPress={() => navigation.navigate('RecipeFollow', { steps: recipe.steps })}
+        >
           <Text style={styles.startBtnText}>레시피 따라하기</Text>
         </TouchableOpacity>
       </View>

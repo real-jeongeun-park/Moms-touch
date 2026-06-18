@@ -3,19 +3,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Svg, { Circle } from 'react-native-svg';
+import { useAudioPlayer } from 'expo-audio';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const { width, height } = Dimensions.get('window');
-
-const STEPS = [
-  { id: 1, time: '00:00', title: '재료 준비', desc: '감자, 애호박, 양파, 대파를 준비하고 감자는 껍질을 벗겨둡니다. 감자는 갈기 좋게 작게 잘라두면 좋아요.', hasTimer: false },
-  { id: 2, time: '05:00', title: '감자 갈기', desc: '손질된 감자를 강판이나 믹서기로 곱게 갈아줍니다. 갈아낸 감자의 물을 살짝 따라 내어 농도를 맞춰두세요.', hasTimer: true, duration: 420 },
-  { id: 3, time: '12:00', title: '물기 짜기와 전분 가라앉히기', desc: '간 감자를 면포에 넣고 물기를 꼭 짜주세요. 나온 감자 물은 바로 버리지 말고 잠시 두어 전분이 가라앉게 해주세요.', hasTimer: true, duration: 645 },
-  { id: 4, time: '22:00', title: '반죽 만들기', desc: '갈아둔 감자에 전분가루와 소금을 넣고 농도가 맞게 섞어 반죽을 만들어 주세요.', hasTimer: false },
-  { id: 5, time: '27:00', title: '옹심이 빚기', desc: '완성된 반죽을 둥글게 동글동글하게 빚어두세요.', hasTimer: false },
-  { id: 6, time: '35:00', title: '육수 끓이기', desc: '끓여진 다시마 육수에 채소를 넣고 끓여주세요.', hasTimer: true, duration: 300 },
-  { id: 7, time: '40:00', title: '옹심이 넣기', desc: '옹심이가 끓어오르면 떠오르는 것들이 조리 중이에요.', hasTimer: true, duration: 300 },
-  { id: 8, time: '47:00', title: '담고 마무리 하기', desc: '끓여진 감자옹심이를 그릇에 담고 파를 올려 마무리해주세요.', hasTimer: false },
-];
 
 const RADIUS = 90;
 const STROKE = 22;
@@ -24,28 +16,58 @@ const SHEET_HEIGHT = height * 0.7;
 const BAR_HEIGHT = 85;
 
 export default function RecipeFollow() {
+  const player = useAudioPlayer(null);  // 상단에 선언
+
+  const speakDesc = async (text: string) => {
+    try {
+      const res = await fetch(`${API_URL}/text-to-speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!res.ok) throw new Error(`서버 에러: ${res.status}`);
+
+      const arrayBuffer = await res.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+      const uri = `data:audio/mpeg;base64,${base64}`;
+
+      player.replace({ uri });
+      player.play();
+
+    } catch (e) {
+      console.error('TTS 실패:', e);
+    }
+  };
+
   const navigation = useNavigation() as any;
   const route = useRoute() as any;
-  const steps = route.params?.steps ?? STEPS;
+  const steps = route.params?.steps;
 
   const [currentStep, setCurrentStep] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(steps[0].duration ?? 0);
+  const [timeLeft, setTimeLeft] = useState(steps[0].timestamp ?? 0);
   const [isRunning, setIsRunning] = useState(false);
   const intervalRef = useRef<any>(null);
   const sheetAnim = useRef(new Animated.Value(SHEET_HEIGHT - BAR_HEIGHT)).current;
 
   const step = steps[currentStep];
-  const total = step.duration ?? 1;
+  const total = (step.timestamp ?? 1) * 60;
   const progress = timeLeft / total;
 
+  // 1. step 바뀔 때 초기값 설정
   useEffect(() => {
-    setTimeLeft(step.duration ?? 0);
+    setTimeLeft((step.timestamp ?? 0) * 60);  // 분 → 초
     setIsRunning(false);
     clearInterval(intervalRef.current);
   }, [currentStep]);
 
   useEffect(() => {
-    if (!step.hasTimer) return;
+    if (!step.timestamp) return;
     if (isRunning) {
       intervalRef.current = setInterval(() => {
         setTimeLeft((prev: number) => {
@@ -57,7 +79,7 @@ export default function RecipeFollow() {
       clearInterval(intervalRef.current);
     }
     return () => clearInterval(intervalRef.current);
-  }, [isRunning, step.hasTimer]);
+  }, [isRunning, step.timestamp]);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const dragStartY = useRef(SHEET_HEIGHT - BAR_HEIGHT);
@@ -100,8 +122,13 @@ export default function RecipeFollow() {
   };
 
   const goNext = () => {
-    if (currentStep < steps.length - 1) { setCurrentStep(prev => prev + 1); }
-    else { navigation.navigate('RecipeComplete'); }
+    if (currentStep < steps.length - 1) {
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      speakDesc(steps[nextStep].description);  // 다음 스텝 desc 읽기
+    } else {
+      navigation.navigate('RecipeComplete');
+    }
   };
 
   const goPrev = () => {
@@ -126,12 +153,11 @@ export default function RecipeFollow() {
         </View>
         <View style={styles.textBox}>
           <Text style={styles.stepTitle}>{step.title}</Text>
-          <Text style={styles.stepDesc}>{step.desc}</Text>
+          <Text style={styles.stepDesc}>{step.description}</Text>
         </View>
       </View>
 
-      {/* 타이머 (hasTimer인 단계만) */}
-      {step.hasTimer && (
+      {step.timestamp && (
         <View style={styles.timerWrapper}>
           <Svg width={220} height={220} style={{ transform: [{ rotate: '135deg' }] }}>
             <Circle cx={110} cy={110} r={RADIUS} stroke="#E6E6E6" strokeWidth={STROKE} fill="none"
@@ -193,10 +219,10 @@ export default function RecipeFollow() {
                   </View>
                 </View>
                 <View style={styles.timelineRight}>
-                  <Text style={styles.timelineTime}>{s.time}</Text>
+                  <Text style={styles.timelineTime}>{s.timestamp ? `${s.timestamp}분` : ''}</Text>
                   <View style={styles.timelineCard}>
                     <Text style={styles.timelineCardTitle}>{s.title}</Text>
-                    <Text style={styles.timelineCardDesc}>{s.desc}</Text>
+                    <Text style={styles.timelineCardDesc}>{s.description}</Text>
                   </View>
                 </View>
               </View>

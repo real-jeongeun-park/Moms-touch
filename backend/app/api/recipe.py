@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
+from typing import Optional
 import os, json
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -27,6 +28,27 @@ class SaveRecipeRequest(BaseModel):
     difficulty: int
     ingredients: dict
     steps: list
+    
+class Ingredient(BaseModel):
+    name: str
+    amount: str
+
+class RecipeStep(BaseModel):
+    id: int
+    step_order: int
+    title: Optional[str] = None
+    description: Optional[str] = None
+    timestamp: Optional[int] = None
+
+class RecipeDetail(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    region: Optional[str] = None
+    duration: Optional[int] = None
+    difficulty: Optional[int] = None
+    ingredients: list[Ingredient] = []
+    steps: list[RecipeStep] = []
 
 @router.post("/generate-recipe")
 async def generate_recipe(req: RecipeRequest):
@@ -112,4 +134,45 @@ async def save_recipe(req: SaveRecipeRequest):
 
     finally:
         cur.close()
+        conn.close()
+
+@router.get("/get-recipe/{recipe_id}", response_model=RecipeDetail)
+async def get_recipe(recipe_id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        # recipes 테이블
+        cursor.execute("SELECT * FROM recipes WHERE id = %s", (recipe_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="레시피를 찾을 수 없어요")
+
+        # column명 → dict 변환
+        col_names = [desc[0] for desc in cursor.description]
+        recipe = dict(zip(col_names, row))
+
+        # recipe_steps 테이블
+        cursor.execute(
+            "SELECT * FROM recipe_steps WHERE recipe_id = %s ORDER BY step_order",
+            (recipe_id,)
+        )
+        step_cols = [desc[0] for desc in cursor.description]
+        steps = [dict(zip(step_cols, r)) for r in cursor.fetchall()]
+
+        raw = recipe.get("ingredients") or {}
+        if isinstance(raw, str):
+            import json
+            raw = json.loads(raw)
+
+        ingredients = [{"name": k, "amount": v} for k, v in raw.items()]
+
+        return {
+            **recipe,
+            "ingredients": ingredients,
+            "steps": steps,
+        }
+    
+    finally:
+        cursor.close()
         conn.close()

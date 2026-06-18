@@ -59,7 +59,7 @@ export default function Home() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>인기레시피</Text>
           {recipes.map(item => (
-            <TouchableOpacity key={item.id} style={styles.recipeCard} onPress={() => navigation.navigate('RecipeDetail', { recipe: item })}>
+            <TouchableOpacity key={item.id} style={styles.recipeCard} onPress={() => navigation.navigate('RecipeDetail', { recipe_id: 1 })}>
               <Text style={styles.recipeTitle}>{item.title}</Text>
               <Text style={styles.recipeDesc}>{item.desc}</Text>
               <View style={styles.recipeFooter}>
