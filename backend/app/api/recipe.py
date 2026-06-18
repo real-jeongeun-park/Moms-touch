@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -10,6 +10,13 @@ from psycopg2.extras import RealDictCursor
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
 router = APIRouter()
+
+def serialize_row(row):
+    r = dict(row)
+    for key, val in r.items():
+        if hasattr(val, 'isoformat'):
+            r[key] = val.isoformat()
+    return r
 
 def get_db():
     return psycopg2.connect(os.getenv("DATABASE_URL"))
@@ -28,7 +35,13 @@ class SaveRecipeRequest(BaseModel):
     difficulty: int
     ingredients: dict
     steps: list
-    
+    user_id: int = 1
+
+class FollowRequest(BaseModel):
+    user_id: int
+    recipe_id: int
+
+
 class Ingredient(BaseModel):
     name: str
     amount: str
@@ -101,7 +114,7 @@ async def save_recipe(req: SaveRecipeRequest):
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """, (
-            1,  # 하드코딩
+            req.user_id,
             req.title,
             req.description,
             req.region,
@@ -175,4 +188,132 @@ async def get_recipe(recipe_id: int):
     
     finally:
         cursor.close()
+        conn.close()
+
+
+@router.get("/recipes")
+async def get_recipes(region: Optional[str] = Query(None)):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        if region:
+            cur.execute("""
+                SELECT id, title, description, region, duration, difficulty, ingredients, created_at
+                FROM recipes WHERE region = %s ORDER BY created_at DESC
+            """, (region,))
+        else:
+            cur.execute("""
+                SELECT id, title, description, region, duration, difficulty, ingredients, created_at
+                FROM recipes ORDER BY created_at DESC
+            """)
+        return {"recipes": [serialize_row(r) for r in cur.fetchall()]}
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.get("/recipes/recommended")
+async def get_recommended_recipes(user_id: int):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT preferred_region, preferred_difficulty FROM user_preferences WHERE user_id = %s", (user_id,))
+        pref = cur.fetchone()
+        cur.execute("SELECT id, title, description, region, duration, difficulty, created_at FROM recipes")
+        recipes = cur.fetchall()
+        if not pref:
+            return {"recipes": [serialize_row(r) for r in recipes[:10]]}
+        region = pref["preferred_region"]
+        pref_diff = pref["preferred_difficulty"]
+        if pref_diff <= 2:
+            target_diff = 1
+        elif pref_diff == 3:
+            target_diff = 2
+        else:
+            target_diff = 3
+        scored = []
+        for r in recipes:
+            score = 0
+            if r["region"] == region:
+                score += 3
+            if r["difficulty"] == target_diff:
+                score += 2
+            scored.append((score, r))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return {"recipes": [serialize_row(r) for _, r in scored[:10]]}
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.get("/recipes/{recipe_id}")
+async def get_recipe_by_id(recipe_id: int):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM recipes WHERE id = %s", (recipe_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="레시피를 찾을 수 없어요")
+        recipe = serialize_row(row)
+        if isinstance(recipe.get("ingredients"), str):
+            recipe["ingredients"] = json.loads(recipe["ingredients"])
+        cur.execute("SELECT * FROM recipe_steps WHERE recipe_id = %s ORDER BY step_order", (recipe_id,))
+        recipe["steps"] = [serialize_row(s) for s in cur.fetchall()]
+        return recipe
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.post("/recipe-follows")
+async def follow_recipe(req: FollowRequest):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO recipe_follows (user_id, recipe_id)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id, recipe_id) DO NOTHING
+        """, (req.user_id, req.recipe_id))
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"follow 에러: {e}")
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.get("/users/{user_id}/recipes/made")
+async def get_made_recipes(user_id: int):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT id, title, description, region, duration, difficulty, created_at
+            FROM recipes WHERE user_id = %s ORDER BY created_at DESC
+        """, (user_id,))
+        return {"recipes": [serialize_row(r) for r in cur.fetchall()]}
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.get("/users/{user_id}/recipes/followed")
+async def get_followed_recipes(user_id: int):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT r.id, r.title, r.description, r.region, r.duration, r.difficulty, r.created_at
+            FROM recipes r
+            JOIN recipe_follows rf ON r.id = rf.recipe_id
+            WHERE rf.user_id = %s ORDER BY rf.created_at DESC
+        """, (user_id,))
+        return {"recipes": [serialize_row(r) for r in cur.fetchall()]}
+    finally:
+        cur.close()
         conn.close()

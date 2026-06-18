@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, ImageBackg
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -15,10 +16,12 @@ export default function RecipeUploadDone() {
   useEffect(() => {
     const save = async () => {
       try {
+        const userStr = await AsyncStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
         await fetch(`${API_URL}/save-recipe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(recipe),
+          body: JSON.stringify({ ...recipe, user_id: user?.id ?? 1 }),
         });
       } catch (e) {
         console.log('저장 에러:', e);

@@ -1,100 +1,63 @@
-import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState, useCallback } from 'react';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 import { useNavigation } from '@react-navigation/native';
 
 type TabType = 'made' | 'followed';
 
-const REGIONS = [
-  '서울특별시',
-  '인천광역시',
-  '경기도',
-  '강원도',
-  '충청북도',
-  '충청남도',
-  '전라북도',
-  '전라남도',
-  '경상북도',
-  '경상남도',
-  '제주도',
-  '울릉도',
-  '독도',
-];
-
-const RECIPES = [
-  {
-    id: 1,
-    title: '고들빼기김치',
-    desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치',
-    author: '인자 할머니',
-  },
-  {
-    id: 2,
-    title: '고들빼기김치',
-    desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치',
-    author: '인자 할머니',
-  },
-  {
-    id: 3,
-    title: '고들빼기김치',
-    desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치',
-    author: '인자 할머니',
-  },
-];
-
 export default function MyPage() {
   const navigation = useNavigation() as any;
   const [activeTab, setActiveTab] = useState<TabType>('made');
-  const [selectedRegion, setSelectedRegion] = useState('전라도');
-  const [regionOpen, setRegionOpen] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [madeRecipes, setMadeRecipes] = useState<any[]>([]);
+  const [followedRecipes, setFollowedRecipes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(useCallback(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const userStr = await AsyncStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (!user) return;
+        setUserName(user.user_id);
+        const [madeRes, followedRes] = await Promise.all([
+          fetch(`${API_URL}/users/${user.id}/recipes/made`),
+          fetch(`${API_URL}/users/${user.id}/recipes/followed`),
+        ]);
+        const madeData = await madeRes.json();
+        const followedData = await followedRes.json();
+        setMadeRecipes(madeData.recipes ?? []);
+        setFollowedRecipes(followedData.recipes ?? []);
+      } catch (e) {
+        console.log('마이페이지 로드 에러:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []));
+
+  const displayRecipes = activeTab === 'made' ? madeRecipes : followedRecipes;
+
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem('user');
+    navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" backgroundColor="#FFA23E" />
 
       <View style={styles.hero}>
-        <View style={styles.regionBlock}>
-          <Text style={styles.regionLabel}>지역</Text>
-          <TouchableOpacity
-            style={styles.regionButton}
-            onPress={() => setRegionOpen(open => !open)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.regionText}>{selectedRegion}</Text>
-            <Text style={styles.regionArrow}>{regionOpen ? '⌃' : '⌄'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {regionOpen && (
-          <View style={styles.regionMenu}>
-            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
-              {REGIONS.map(region => (
-                <TouchableOpacity
-                  key={region}
-                  style={[
-                    styles.regionOption,
-                    selectedRegion === region && styles.regionOptionSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedRegion(region);
-                    setRegionOpen(false);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[
-                      styles.regionOptionText,
-                      selectedRegion === region && styles.regionOptionTextSelected,
-                    ]}
-                  >
-                    {region}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.75}>
+          <Image source={require('../assets/images/logout.png')} style={styles.logoutIcon} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -108,18 +71,13 @@ export default function MyPage() {
           </View>
 
           <View style={styles.nameRow}>
-            <Text style={styles.name}>박씨할매</Text>
-            <TouchableOpacity style={styles.editNameBtn} activeOpacity={0.75}>
-              <Image source={require('../assets/images/edit.png')} style={styles.editNameIcon} />
-            </TouchableOpacity>
+            <Text style={styles.name}>{userName || '...'}</Text>
           </View>
 
           <View style={styles.statsBox}>
-            <StatItem label="레시피" value="9" />
+            <StatItem label="만든 레시피" value={String(madeRecipes.length)} />
             <View style={styles.statDivider} />
-            <StatItem label="레시피 도전자" value="9" />
-            <View style={styles.statDivider} />
-            <StatItem label="구독자" value="9" />
+            <StatItem label="따라해본 레시피" value={String(followedRecipes.length)} />
           </View>
         </View>
 
@@ -147,22 +105,30 @@ export default function MyPage() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.cardList}>
-          {RECIPES.map(recipe => (
-            <View key={`${activeTab}-${recipe.id}`} style={styles.recipeCard}>
-              <Text style={styles.recipeTitle}>{recipe.title}</Text>
-              <Text style={styles.recipeDesc}>{recipe.desc}</Text>
+        {loading ? (
+          <ActivityIndicator color="#FF9019" style={{ marginTop: 32 }} />
+        ) : displayRecipes.length === 0 ? (
+          <Text style={styles.emptyText}>
+            {activeTab === 'made' ? '아직 올린 레시피가 없어요' : '아직 따라해본 레시피가 없어요'}
+          </Text>
+        ) : (
+          <View style={styles.cardList}>
+            {displayRecipes.map(recipe => (
               <TouchableOpacity
-                style={styles.authorRow}
-                onPress={() => navigation.navigate('UserProfile', { name: recipe.author, region: selectedRegion })}
-                activeOpacity={0.7}
+                key={`${activeTab}-${recipe.id}`}
+                style={styles.recipeCard}
+                onPress={() => navigation.navigate('RecipeDetail', { recipe_id: recipe.id })}
+                activeOpacity={0.85}
               >
-                <View style={styles.avatarPlaceholder} />
-                <Text style={styles.authorText}>{recipe.author}</Text>
+                <Text style={styles.recipeTitle}>{recipe.title}</Text>
+                <Text style={styles.recipeDesc} numberOfLines={3}>{recipe.description}</Text>
+                <View style={styles.regionRow}>
+                  <Text style={styles.regionText}>{recipe.region}</Text>
+                </View>
               </TouchableOpacity>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -185,67 +151,18 @@ const styles = StyleSheet.create({
   hero: {
     height: 96,
     backgroundColor: '#FFA23E',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    zIndex: 10,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
   },
-  regionBlock: {
-    gap: 8,
-    marginTop: 10,
-    alignSelf: 'flex-start',
+  logoutBtn: {
+    padding: 4,
   },
-  regionLabel: {
-    fontFamily: 'NanumHuman-Bold',
-    fontSize: 12,
-    color: '#FFFFFF',
-  },
-  regionButton: {
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  regionText: {
-    fontFamily: 'NanumHuman-Bold',
-    fontSize: 20,
-    color: '#FFFFFF',
-  },
-  regionArrow: {
-    marginTop: 1,
-    fontFamily: 'NanumHuman-Bold',
-    fontSize: 19,
-    color: '#FFFFFF',
-  },
-  regionMenu: {
-    position: 'absolute',
-    left: 28,
-    top: 78,
-    width: 132,
-    maxHeight: 238,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-    overflow: 'hidden',
-  },
-  regionOption: {
-    height: 36,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  regionOptionSelected: {
-    backgroundColor: '#FFF2E4',
-  },
-  regionOptionText: {
-    fontFamily: 'NanumHuman-Bold',
-    fontSize: 13,
-    color: '#42403D',
-  },
-  regionOptionTextSelected: {
-    color: '#FF9019',
+  logoutIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
   scrollContent: {
     paddingBottom: 28,
@@ -273,25 +190,12 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     marginTop: 11,
   },
   name: {
     fontFamily: 'NanumHuman-EB',
     fontSize: 20,
     color: '#181818',
-  },
-  editNameBtn: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editNameIcon: {
-    width: 18,
-    height: 18,
-    resizeMode: 'contain',
-    tintColor: '#8D8986',
   },
   statsBox: {
     width: '100%',
@@ -381,21 +285,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: '#827E7B',
   },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 16,
+  regionRow: {
+    marginTop: 12,
   },
-  avatarPlaceholder: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#F1F1F1',
-  },
-  authorText: {
+  regionText: {
     fontFamily: 'NanumHuman-Bold',
+    fontSize: 13,
+    color: '#FFA23E',
+  },
+  emptyText: {
+    fontFamily: 'NanumHuman-Regular',
     fontSize: 14,
-    color: '#181818',
+    color: '#9B9794',
+    textAlign: 'center',
+    marginTop: 40,
   },
 });

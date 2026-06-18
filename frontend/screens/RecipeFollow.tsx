@@ -48,6 +48,7 @@ export default function RecipeFollow() {
   const navigation = useNavigation() as any;
   const route = useRoute() as any;
   const steps = route.params?.steps;
+  const recipe = route.params?.recipe ?? null;
 
   const [currentStep, setCurrentStep] = useState(0);
   const [timeLeft, setTimeLeft] = useState(steps[0].timestamp ?? 0);
@@ -127,7 +128,7 @@ export default function RecipeFollow() {
       setCurrentStep(nextStep);
       speakDesc(steps[nextStep].description);  // 다음 스텝 desc 읽기
     } else {
-      navigation.navigate('RecipeComplete');
+      navigation.navigate('RecipeComplete', { recipe });
     }
   };
 

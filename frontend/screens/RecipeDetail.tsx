@@ -148,7 +148,7 @@ export default function RecipeDetail() {
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.startBtn}
-          onPress={() => navigation.navigate('RecipeFollow', { steps: recipe.steps })}
+          onPress={() => navigation.navigate('RecipeStart', { recipe })}
         >
           <Text style={styles.startBtnText}>레시피 따라하기</Text>
         </TouchableOpacity>

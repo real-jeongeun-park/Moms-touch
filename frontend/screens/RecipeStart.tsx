@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 const starImages: Record<number, any> = {
   1: require('../assets/images/star1.png'),
@@ -10,19 +10,18 @@ const starImages: Record<number, any> = {
   5: require('../assets/images/star5.png'),
 };
 
-const INGREDIENTS = [
-  { name: '감자', amount: '4개' },
-  { name: '다진마늘', amount: '1작은술' },
-  { name: '국장', amount: '1큰술' },
-  { name: '감자전분', amount: '3큰술' },
-  { name: '소금', amount: '약간' },
-  { name: '애호박', amount: '1/3개' },
-  { name: '양파', amount: '1/4개' },
-  { name: '멸치 다시마 육수', amount: '700ml' },
-];
-
 export default function RecipeStart() {
   const navigation = useNavigation() as any;
+  const route = useRoute() as any;
+  const recipe = route.params?.recipe;
+
+  const ingredients: { name: string; amount: string }[] = recipe
+    ? Object.entries(
+        typeof recipe.ingredients === 'string'
+          ? JSON.parse(recipe.ingredients)
+          : (recipe.ingredients ?? {})
+      ).map(([name, amount]) => ({ name, amount: amount as string }))
+    : [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -37,8 +36,8 @@ export default function RecipeStart() {
 
         {/* 제목 */}
         <View style={styles.titleSection}>
-          <Text style={styles.title}>강원도 감자옹심이</Text>
-          <Text style={styles.subtitle}>감자로 빚어낸 투박하고 따뜻한 한 그릇</Text>
+          <Text style={styles.title}>{recipe ? `${recipe.region} ${recipe.title}` : ''}</Text>
+          <Text style={styles.subtitle}>{recipe?.description ?? ''}</Text>
         </View>
 
         {/* 할머니 이미지 */}
@@ -51,16 +50,16 @@ export default function RecipeStart() {
         <View style={styles.infoSection}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>소요 시간</Text>
-            <Text style={styles.infoValue}>50분</Text>
+            <Text style={styles.infoValue}>{recipe?.duration ?? 0}분</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>난이도</Text>
-            <Image source={starImages[3]} style={styles.starImage} />
+            <Image source={starImages[recipe?.difficulty ?? 1]} style={styles.starImage} />
           </View>
           <View style={[styles.infoRow, { alignItems: 'flex-start' }]}>
             <Text style={[styles.infoLabel, { paddingTop: 4 }]}>재료</Text>
             <View style={styles.ingredientGrid}>
-              {INGREDIENTS.map(ing => (
+              {ingredients.map(ing => (
                 <View key={ing.name} style={styles.ingredientItem}>
                   <Text style={styles.ingName}>{ing.name}</Text>
                   <Text style={styles.ingAmount}>{ing.amount}</Text>
@@ -74,7 +73,7 @@ export default function RecipeStart() {
 
       {/* 하단 버튼 */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.startBtn} onPress={() => navigation.navigate('RecipeFollow')}>
+        <TouchableOpacity style={styles.startBtn} onPress={() => navigation.navigate('RecipeFollow', { steps: recipe?.steps ?? [], recipe })}>
           <Text style={styles.startBtnText}>시작하기</Text>
         </TouchableOpacity>
       </View>
