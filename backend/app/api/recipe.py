@@ -234,39 +234,102 @@ async def get_recipes(region: Optional[str] = Query(None)):
         conn.close()
 
 
+RECIPE_SELECT = """
+    SELECT r.id, r.title, r.description, r.region, r.duration, r.difficulty, r.use_count, r.created_at,
+           u.user_id AS author
+    FROM recipes r LEFT JOIN users u ON r.user_id = u.id
+"""
+
+
+def _ai_pick_top3(recipes, food_type, pref_diff):
+    """후보 레시피 중 사용자 선호(음식 종류·난이도)에 맞는 TOP3 id를 GPT로 추천받는다."""
+    candidates = [
+        {
+            "id": r["id"],
+            "title": r["title"],
+            "description": r["description"],
+            "difficulty": r["difficulty"],
+        }
+        for r in recipes
+    ]
+    prompt = f"""
+        너는 한국 가정식 레시피 추천 도우미야.
+        사용자 선호:
+        - 좋아하는 음식 종류: {food_type}
+        - 선호하는 요리 난이도: {pref_diff} (1=입문, 5=전문가. 레시피의 difficulty는 1~3 스케일이야)
+
+        아래 레시피 후보 목록 중에서 사용자 취향에 가장 잘 맞는 3개를 골라줘.
+        음식 종류가 가장 중요하고, 그다음 난이도가 비슷한 걸 우선해.
+
+        후보 목록(JSON): {json.dumps(candidates, ensure_ascii=False)}
+
+        반드시 아래 JSON 형식으로만 응답해. 다른 말은 절대 하지 마.
+        {{"top3": [가장 잘 맞는 레시피 id, 두번째 id, 세번째 id]}}
+        후보가 3개 미만이면 있는 만큼만 넣어줘.
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+    raw = response.choices[0].message.content.strip()
+    data = json.loads(raw)
+    ids = data.get("top3", [])
+    return [int(i) for i in ids]
+
+
 @router.get("/recipes/recommended")
 async def get_recommended_recipes(user_id: int):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT preferred_region, preferred_difficulty FROM user_preferences WHERE user_id = %s", (user_id,))
+        cur.execute(
+            "SELECT preferred_region, preferred_food_type, preferred_difficulty FROM user_preferences WHERE user_id = %s",
+            (user_id,),
+        )
         pref = cur.fetchone()
-        cur.execute("""
-            SELECT r.id, r.title, r.description, r.region, r.duration, r.difficulty, r.created_at,
-                   u.user_id AS author
-            FROM recipes r LEFT JOIN users u ON r.user_id = u.id
-        """)
-        recipes = cur.fetchall()
+
+        # 선호 정보가 없으면 최신 레시피로 폴백
         if not pref:
-            return {"recipes": [serialize_row(r) for r in recipes[:10]]}
+            cur.execute(RECIPE_SELECT + " ORDER BY r.created_at DESC")
+            return {"recipes": [serialize_row(r) for r in cur.fetchall()[:10]]}
+
         region = pref["preferred_region"]
-        pref_diff = pref["preferred_difficulty"]
-        if pref_diff <= 2:
-            target_diff = 1
-        elif pref_diff == 3:
-            target_diff = 2
-        else:
-            target_diff = 3
-        scored = []
-        for r in recipes:
-            score = 0
-            if r["region"] == region:
-                score += 3
-            if r["difficulty"] == target_diff:
-                score += 2
-            scored.append((score, r))
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return {"recipes": [serialize_row(r) for _, r in scored[:10]]}
+        food_type = pref["preferred_food_type"]
+        pref_diff = pref["preferred_difficulty"] or 3
+
+        # 1) 지역으로 후보 필터링
+        candidates = []
+        if region:
+            cur.execute(RECIPE_SELECT + " WHERE r.region = %s ORDER BY r.created_at DESC", (region,))
+            candidates = cur.fetchall()
+        # 지역 후보가 너무 적으면 전체로 폴백
+        if len(candidates) < 3:
+            cur.execute(RECIPE_SELECT + " ORDER BY r.created_at DESC")
+            candidates = cur.fetchall()
+
+        # 후보가 3개 이하면 그대로 반환 (AI 호출 불필요)
+        if len(candidates) <= 3:
+            return {"recipes": [serialize_row(r) for r in candidates]}
+
+        # 2) 후보 + 사용자 선호를 GPT에 넘겨 TOP3 추천
+        try:
+            top_ids = _ai_pick_top3(candidates, food_type, pref_diff)
+            by_id = {r["id"]: r for r in candidates}
+            ranked = [by_id[i] for i in top_ids if i in by_id]
+            # AI가 추천 못한 경우 채워넣기
+            if len(ranked) < 3:
+                for r in candidates:
+                    if r not in ranked:
+                        ranked.append(r)
+                    if len(ranked) >= 3:
+                        break
+            return {"recipes": [serialize_row(r) for r in ranked[:10]]}
+        except Exception as e:
+            print(f"추천 AI 호출 에러: {e}")
+            # 실패 시 지역 필터된 후보 그대로 반환
+            return {"recipes": [serialize_row(r) for r in candidates[:10]]}
     finally:
         cur.close()
         conn.close()
