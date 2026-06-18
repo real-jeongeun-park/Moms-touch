@@ -6,7 +6,6 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
-import { useNavigation } from '@react-navigation/native';
 
 type TabType = 'made' | 'followed';
 
