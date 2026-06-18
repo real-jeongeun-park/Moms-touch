@@ -15,12 +15,14 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
 credentials = service_account.Credentials.from_service_account_file(
     os.getenv("CREDENTIALS_PATH"),
+
+    
     scopes=["https://www.googleapis.com/auth/cloud-platform"]
 )
 
 class TTSRequest(BaseModel):
     text: str
-    voice: str = "ko-KR-Neural2-A"
+    voice: str = "ko-KR-Chirp3-HD-Vindemiatrix"
 
 @router.post("/text-to-speech")
 async def text_to_speech(req: TTSRequest):

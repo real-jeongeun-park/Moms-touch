@@ -57,8 +57,8 @@ export default function RecipeDetail() {
   };
 
   const stepsWithAccTime = recipe.steps.reduce((acc: any[], step: any, i: number) => {
-    const prev = i === 0 ? 0 : acc[i - 1].accTime;
-    return [...acc, { ...step, accTime: prev + (step.timestamp ?? 0) }];
+    const prev = i === 0 ? 0 : acc[i - 1].accTime + (acc[i - 1].timestamp ?? 0);
+    return [...acc, { ...step, accTime: prev }];
   }, []);
 
   return (

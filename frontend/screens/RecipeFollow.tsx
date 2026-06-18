@@ -16,7 +16,13 @@ const SHEET_HEIGHT = height * 0.7;
 const BAR_HEIGHT = 85;
 
 export default function RecipeFollow() {
-  const player = useAudioPlayer(null);  // 상단에 선언
+  const player = useAudioPlayer(null); 
+
+  const tickingPlayer = useAudioPlayer(
+    require('../assets/audio/ticking.mp3')
+  );
+  
+  tickingPlayer.volume = 0.2;
 
   const speakDesc = async (text: string) => {
     try {
@@ -64,6 +70,8 @@ export default function RecipeFollow() {
     setTimeLeft((step.timestamp ?? 0) * 60);  // 분 → 초
     setIsRunning(false);
     clearInterval(intervalRef.current);
+
+    speakDesc(step.description);
   }, [currentStep]);
 
   useEffect(() => {
@@ -80,6 +88,16 @@ export default function RecipeFollow() {
     }
     return () => clearInterval(intervalRef.current);
   }, [isRunning, step.timestamp]);
+
+  useEffect(() => {
+    if (isRunning) {
+      tickingPlayer.loop = true;
+      tickingPlayer.play();
+    } else {
+      tickingPlayer.pause();
+      tickingPlayer.seekTo(0); // 처음으로 되돌리기
+    }
+  }, [isRunning]);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const dragStartY = useRef(SHEET_HEIGHT - BAR_HEIGHT);
@@ -125,14 +143,16 @@ export default function RecipeFollow() {
     if (currentStep < steps.length - 1) {
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
-      speakDesc(steps[nextStep].description);  // 다음 스텝 desc 읽기
     } else {
       navigation.navigate('RecipeComplete');
     }
   };
 
   const goPrev = () => {
-    if (currentStep > 0) { setCurrentStep(prev => prev - 1); }
+    if (currentStep > 0) {
+      const prevStep = currentStep - 1;
+      setCurrentStep(prevStep);
+    }
   };
 
   const progressBarWidth = ((currentStep + 1) / steps.length) * (width - 56);
