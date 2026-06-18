@@ -15,14 +15,15 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState<TabType>('made');
 
   // 탭별 레시피 (실데이터 연동 전 임시)
+  const profileAvatar = require('../assets/images/grandma_mypage.png');
   const madeRecipes = [
-    { id: 1, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name },
-    { id: 2, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name },
-    { id: 3, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name },
+    { id: 1, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name, avatar: profileAvatar },
+    { id: 2, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name, avatar: profileAvatar },
+    { id: 3, title: '고들빼기김치', desc: '고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치고들빼기김치', author: name, avatar: profileAvatar },
   ];
   const likedRecipes = [
-    { id: 1, title: '꼬막무침', desc: '삶은 꼬막과 매콤새콤한 양념의 조화꼬막무침꼬막무침꼬막무침꼬막무침', author: '순자 할머니' },
-    { id: 2, title: '동태찌개', desc: '칼칼하고 시원한 동태찌개동태찌개동태찌개동태찌개동태찌개동태찌개', author: '영자 할머니' },
+    { id: 1, title: '꼬막무침', desc: '삶은 꼬막과 매콤새콤한 양념의 조화꼬막무침꼬막무침꼬막무침꼬막무침', author: '순자 할머니', avatar: require('../assets/images/grandma_cook.png') },
+    { id: 2, title: '동태찌개', desc: '칼칼하고 시원한 동태찌개동태찌개동태찌개동태찌개동태찌개동태찌개', author: '영자 할머니', avatar: require('../assets/images/grandma_talk.png') },
   ];
   const recipes = activeTab === 'made' ? madeRecipes : likedRecipes;
 
@@ -30,22 +31,22 @@ export default function UserProfile() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar style="light" backgroundColor="#FFA23E" />
 
-      {/* 주황 헤더 */}
-      <View style={styles.hero}>
-        <SafeAreaView edges={['top']} style={styles.heroSafe}>
-          <View style={styles.heroTopRow}>
-            <View style={styles.regionBlock}>
-              <Text style={styles.regionLabel}>지역</Text>
-              <Text style={styles.regionText}>{region}</Text>
-            </View>
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.75}>
-              <Image source={require('../assets/images/back.png')} style={styles.backIcon} />
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </View>
-
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* 주황 헤더 (스크롤 안에 두어야 프로필이 잘리지 않음) */}
+        <View style={styles.hero}>
+          <SafeAreaView edges={['top']} style={styles.heroSafe}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.regionBlock}>
+                <Text style={styles.regionLabel}>지역</Text>
+                <Text style={styles.regionText}>{region}</Text>
+              </View>
+              <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.75}>
+                <Image source={require('../assets/images/back.png')} style={styles.backIcon} />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
+
         {/* 헤더에 걸친 원형 프로필 */}
         <View style={styles.profileSection}>
           <View style={styles.avatarCircle}>
@@ -74,7 +75,7 @@ export default function UserProfile() {
             {activeTab === 'made' && <View style={styles.tabIndicator} />}
           </TouchableOpacity>
           <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('liked')} activeOpacity={0.8}>
-            <Text style={[styles.tabText, activeTab === 'liked' && styles.tabTextActive]}>좋아요한 레시피</Text>
+            <Text style={[styles.tabText, activeTab === 'liked' && styles.tabTextActive]}>좋아요 누른 레시피</Text>
             {activeTab === 'liked' && <View style={styles.tabIndicator} />}
           </TouchableOpacity>
         </View>
@@ -91,7 +92,7 @@ export default function UserProfile() {
               <Text style={styles.recipeTitle}>{recipe.title}</Text>
               <Text style={styles.recipeDesc} numberOfLines={2}>{recipe.desc}</Text>
               <View style={styles.authorRow}>
-                <View style={styles.authorAvatar} />
+                <Image source={recipe.avatar} style={styles.authorAvatar} resizeMode="cover" />
                 <Text style={styles.authorText}>{recipe.author}</Text>
               </View>
             </TouchableOpacity>
@@ -166,17 +167,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 28,
     marginTop: -AVATAR / 2, // 헤더 하단에 절반 걸치게
+    zIndex: 10, // 주황 헤더 위로 올라오게
   },
   avatarCircle: {
     width: AVATAR,
     height: AVATAR,
     borderRadius: AVATAR / 2,
     backgroundColor: '#FCFCFC',
-    borderWidth: 1,
-    borderColor: '#8D8986',
+    borderWidth: 4,
+    borderColor: '#FCFCFC', // 주황 바 위로 떠 보이도록 흰색 링
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    zIndex: 10,
+    elevation: 6, // 안드로이드에서 헤더 위로
+    shadowColor: '#7A4A12',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
   },
   avatarImage: {
     width: 81,
@@ -288,6 +296,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     backgroundColor: '#F3F3F3',
+    overflow: 'hidden',
   },
   authorText: {
     fontFamily: 'NanumHuman-Bold',
