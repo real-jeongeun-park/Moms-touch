@@ -5,6 +5,13 @@
 집안 어른들의 입에서 입으로 전해지던 레시피를 디지털로 보존하자는 아이디어에서 시작했습니다.
 복잡한 입력 없이 **음성으로 말하거나 채팅**만 하면, AI가 재료·난이도·소요시간·조리 단계를 자동으로 구조화해 레시피로 만들어 줍니다.
 
+<img width="2560" height="1440" alt="일확천금팀_1" src="https://github.com/user-attachments/assets/8bfd3119-e76b-46f0-a5a5-ea55288375d3" />
+<img width="2560" height="1440" alt="일확천금팀_10" src="https://github.com/user-attachments/assets/6a075007-4a93-4b1d-b31a-8478fe31de85" />
+<img width="2560" height="1440" alt="일확천금팀_21" src="https://github.com/user-attachments/assets/30946d94-e5f6-4462-adca-b6ac542f7443" />
+<img width="2560" height="1440" alt="일확천금팀_22" src="https://github.com/user-attachments/assets/62ffac89-b522-4156-936e-2b21f6219184" />
+<img width="2560" height="1440" alt="일확천금팀_23" src="https://github.com/user-attachments/assets/f9f4e635-ea0f-418e-8756-1b56dc3897af" />
+<img width="2560" height="1440" alt="일확천금팀_25" src="https://github.com/user-attachments/assets/a573e2d2-9b42-4e6d-9987-dec746fc66c0" />
+
 ---
 
 ## ✨ 주요 기능
